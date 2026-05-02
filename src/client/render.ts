@@ -39,6 +39,7 @@ export function renderSourceStatuses(target: HTMLElement, statuses: SourceStatus
 
 export function renderLogLines(target: HTMLElement, lines: LogLine[], autoScroll: boolean, logOrder: LogOrder): void {
   const previousScrollTop = target.scrollTop;
+  const previousScrollHeight = target.scrollHeight;
   target.textContent = '';
 
   const fragment = document.createDocumentFragment();
@@ -50,6 +51,8 @@ export function renderLogLines(target: HTMLElement, lines: LogLine[], autoScroll
 
   if (autoScroll) {
     target.scrollTop = logOrder === 'newest-first' ? 0 : target.scrollHeight;
+  } else if (logOrder === 'newest-first') {
+    target.scrollTop = previousScrollTop + (target.scrollHeight - previousScrollHeight);
   } else {
     target.scrollTop = previousScrollTop;
   }
