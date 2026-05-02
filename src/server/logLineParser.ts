@@ -6,6 +6,7 @@ const TIMESTAMP_PREFIX_PATTERN = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}/;
 
 export class LogLineParser {
   private readonly lastGroupIdBySource = new Map<LogSource, string>();
+  private readonly lastHeaderBySource = new Map<LogSource, HeaderContext>();
   private readonly nextGroupBySource = new Map<LogSource, number>();
 
   parse(sourceConfig: SourceConfig, rawLine: string, receivedAt = new Date().toISOString()): LogLineDraft {
@@ -16,6 +17,12 @@ export class LogLineParser {
       const timestamp = parseLocalTimestamp(headerMatch[1]);
       if (timestamp) {
         const groupId = this.createGroupId(sourceConfig.source);
+        this.storeHeaderContext(sourceConfig.source, {
+          timestamp,
+          level: headerMatch[2] as LogLevel,
+          logger: headerMatch[3],
+          groupId
+        });
 
         return {
           source: sourceConfig.source,
@@ -34,6 +41,7 @@ export class LogLineParser {
     }
 
     const isContinuation = !TIMESTAMP_PREFIX_PATTERN.test(normalizedLine);
+    const lastHeader = this.lastHeaderBySource.get(sourceConfig.source);
 
     return {
       source: sourceConfig.source,
@@ -41,12 +49,12 @@ export class LogLineParser {
       rawLine: normalizedLine,
       receivedAt,
       isTimestamped: false,
-      timestamp: null,
-      level: null,
-      logger: null,
+      timestamp: isContinuation ? lastHeader?.timestamp ?? null : null,
+      level: isContinuation ? lastHeader?.level ?? null : null,
+      logger: isContinuation ? lastHeader?.logger ?? null : null,
       message: normalizedLine,
       isContinuation,
-      groupId: isContinuation ? this.lastGroupIdBySource.get(sourceConfig.source) ?? null : null
+      groupId: isContinuation ? lastHeader?.groupId ?? this.lastGroupIdBySource.get(sourceConfig.source) ?? null : null
     };
   }
 
@@ -58,6 +66,17 @@ export class LogLineParser {
     this.lastGroupIdBySource.set(source, groupId);
     return groupId;
   }
+
+  private storeHeaderContext(source: LogSource, header: HeaderContext): void {
+    this.lastHeaderBySource.set(source, header);
+  }
+}
+
+interface HeaderContext {
+  timestamp: string;
+  level: LogLevel;
+  logger: string;
+  groupId: string;
 }
 
 function parseLocalTimestamp(input: string): string | null {

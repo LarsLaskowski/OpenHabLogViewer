@@ -67,13 +67,23 @@ function createLogLineElement(line: LogLine): HTMLElement {
     line.isContinuation ? 'continuation' : 'head-line'
   ].join(' ');
 
-  row.append(
-    createCell('time-cell', line.timestamp ? formatTimestamp(line.timestamp) : '—'),
-    createBadgeCell('source-cell', line.fileName, `source-badge source-${line.source}`),
-    createBadgeCell('level-cell', line.level ?? '—', `level-badge ${line.level ? `level-${line.level.toLowerCase()}` : 'level-none'}`),
-    createCell('logger-cell', line.logger ?? '—'),
-    createMessageCell(line)
-  );
+  if (line.isContinuation) {
+    row.append(
+      createPlaceholderCell('time-cell'),
+      createPlaceholderCell('source-cell'),
+      createPlaceholderCell('level-cell'),
+      createPlaceholderCell('logger-cell'),
+      createMessageCell(line)
+    );
+  } else {
+    row.append(
+      createCell('time-cell', line.timestamp ? formatTimestamp(line.timestamp) : '—'),
+      createBadgeCell('source-cell', line.fileName, `source-badge source-${line.source}`),
+      createBadgeCell('level-cell', line.level ?? '—', `level-badge ${line.level ? `level-${line.level.toLowerCase()}` : 'level-none'}`),
+      createCell('logger-cell', line.logger ?? '—'),
+      createMessageCell(line)
+    );
+  }
 
   return row;
 }
@@ -95,6 +105,13 @@ function createBadgeCell(className: string, text: string, badgeClassName: string
 
   wrapper.append(badge);
   return wrapper;
+}
+
+function createPlaceholderCell(className: string): HTMLElement {
+  const element = document.createElement('div');
+  element.className = `${className} placeholder-cell`;
+  element.setAttribute('aria-hidden', 'true');
+  return element;
 }
 
 function createMessageCell(line: LogLine): HTMLElement {
