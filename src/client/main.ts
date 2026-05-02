@@ -1,8 +1,18 @@
 import { applyFilters } from './filters.js';
 import { renderConnectionStatus, renderLogLines, renderSourceStatuses } from './render.js';
-import { BootstrapResponse, LogLine, LogOrder, SourceStatus, Theme, createInitialState } from './state.js';
+import {
+  BootstrapResponse,
+  ClientState,
+  FiltersState,
+  LogLine,
+  LogOrder,
+  SourceStatus,
+  Theme,
+  createInitialState
+} from './state.js';
 
 const state = createInitialState();
+const UI_PREFERENCES_STORAGE_KEY = 'openhab-log-viewer.ui-preferences';
 const THEME_STORAGE_KEY = 'openhab-log-viewer.theme';
 const LOG_ORDER_STORAGE_KEY = 'openhab-log-viewer.log-order';
 
@@ -21,11 +31,9 @@ const clearButtonElement = getRequiredInput<HTMLButtonElement>('clear-button');
 void bootstrap();
 
 async function bootstrap(): Promise<void> {
-  state.theme = loadStoredTheme();
-  state.logOrder = loadStoredLogOrder();
+  applyStoredPreferences(loadStoredPreferences());
   applyTheme(state.theme);
-  themeSelectElement.value = state.theme;
-  orderSelectElement.value = state.logOrder;
+  syncControlsFromState();
   renderConnectionStatus(connectionStatusElement, state.connectionState);
 
   const response = await fetch('/api/bootstrap');
@@ -45,38 +53,43 @@ async function bootstrap(): Promise<void> {
 function bindControls(): void {
   sourceFilterElement.addEventListener('change', () => {
     state.filters.source = sourceFilterElement.value as typeof state.filters.source;
+    persistPreferences();
     renderAll();
   });
 
   levelFilterElement.addEventListener('change', () => {
     state.filters.level = levelFilterElement.value as typeof state.filters.level;
+    persistPreferences();
     renderAll();
   });
 
   textFilterElement.addEventListener('input', () => {
     state.filters.query = textFilterElement.value;
+    persistPreferences();
     renderAll();
   });
 
   themeSelectElement.addEventListener('change', () => {
     state.theme = parseTheme(themeSelectElement.value);
     applyTheme(state.theme);
-    localStorage.setItem(THEME_STORAGE_KEY, state.theme);
+    persistPreferences();
   });
 
   orderSelectElement.addEventListener('change', () => {
     state.logOrder = parseLogOrder(orderSelectElement.value);
-    localStorage.setItem(LOG_ORDER_STORAGE_KEY, state.logOrder);
+    persistPreferences();
     renderAll();
   });
 
   autoScrollElement.addEventListener('change', () => {
     state.autoScroll = autoScrollElement.checked;
+    persistPreferences();
     renderAll();
   });
 
   pauseToggleElement.addEventListener('change', () => {
     state.paused = pauseToggleElement.checked;
+    persistPreferences();
     if (!state.paused) {
       renderAll();
     }
@@ -139,12 +152,111 @@ function getRequiredInput<T extends HTMLElement>(id: string): T {
   return getRequiredElement(id) as T;
 }
 
-function loadStoredTheme(): Theme {
-  const storedValue = localStorage.getItem(THEME_STORAGE_KEY);
-  return parseTheme(storedValue);
+function applyStoredPreferences(preferences: StoredUiPreferences): void {
+  state.filters = preferences.filters;
+  state.theme = preferences.theme;
+  state.logOrder = preferences.logOrder;
+  state.autoScroll = preferences.autoScroll;
+  state.paused = preferences.paused;
 }
 
-function parseTheme(value: string | null): Theme {
+function syncControlsFromState(): void {
+  sourceFilterElement.value = state.filters.source;
+  levelFilterElement.value = state.filters.level;
+  textFilterElement.value = state.filters.query;
+  themeSelectElement.value = state.theme;
+  orderSelectElement.value = state.logOrder;
+  autoScrollElement.checked = state.autoScroll;
+  pauseToggleElement.checked = state.paused;
+}
+
+function persistPreferences(): void {
+  const preferences: StoredUiPreferences = {
+    filters: state.filters,
+    theme: state.theme,
+    logOrder: state.logOrder,
+    autoScroll: state.autoScroll,
+    paused: state.paused
+  };
+
+  localStorage.setItem(UI_PREFERENCES_STORAGE_KEY, JSON.stringify(preferences));
+  localStorage.setItem(THEME_STORAGE_KEY, state.theme);
+  localStorage.setItem(LOG_ORDER_STORAGE_KEY, state.logOrder);
+}
+
+function loadStoredPreferences(): StoredUiPreferences {
+  const storedValue = localStorage.getItem(UI_PREFERENCES_STORAGE_KEY);
+  const parsedValue = parseStoredPreferences(storedValue);
+
+  return {
+    filters: parsedValue?.filters ?? createInitialState().filters,
+    theme: parsedValue?.theme ?? loadStoredTheme(),
+    logOrder: parsedValue?.logOrder ?? loadStoredLogOrder(),
+    autoScroll: parsedValue?.autoScroll ?? true,
+    paused: parsedValue?.paused ?? false
+  };
+}
+
+function parseStoredPreferences(value: string | null): Partial<StoredUiPreferences> | null {
+  if (!value) {
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    console.warn('Ignoring invalid stored UI preferences.');
+    return null;
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    return null;
+  }
+
+  const candidate = parsed as Record<string, unknown>;
+
+  return {
+    filters: parseStoredFilters(candidate.filters),
+    theme: parseOptionalTheme(candidate.theme),
+    logOrder: parseOptionalLogOrder(candidate.logOrder),
+    autoScroll: typeof candidate.autoScroll === 'boolean' ? candidate.autoScroll : undefined,
+    paused: typeof candidate.paused === 'boolean' ? candidate.paused : undefined
+  };
+}
+
+function parseStoredFilters(value: unknown): FiltersState | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  return {
+    source: parseSourceFilter(candidate.source),
+    level: parseLevelFilter(candidate.level),
+    query: typeof candidate.query === 'string' ? candidate.query : ''
+  };
+}
+
+function parseSourceFilter(value: unknown): FiltersState['source'] {
+  return value === 'events' || value === 'openhab' ? value : 'all';
+}
+
+function parseLevelFilter(value: unknown): FiltersState['level'] {
+  return value === 'TRACE' || value === 'DEBUG' || value === 'INFO' || value === 'WARN' || value === 'ERROR'
+    ? value
+    : 'all';
+}
+
+function loadStoredTheme(): Theme {
+  return parseTheme(localStorage.getItem(THEME_STORAGE_KEY));
+}
+
+function parseOptionalTheme(value: unknown): Theme | undefined {
+  return value === 'light' || value === 'dark' ? value : undefined;
+}
+
+function parseTheme(value: unknown): Theme {
   return value === 'dark' ? 'dark' : 'light';
 }
 
@@ -153,15 +265,26 @@ function applyTheme(theme: Theme): void {
 }
 
 function loadStoredLogOrder(): LogOrder {
-  const storedValue = localStorage.getItem(LOG_ORDER_STORAGE_KEY);
-  return parseLogOrder(storedValue);
+  return parseLogOrder(localStorage.getItem(LOG_ORDER_STORAGE_KEY));
 }
 
-function parseLogOrder(value: string | null): LogOrder {
+function parseOptionalLogOrder(value: unknown): LogOrder | undefined {
+  return value === 'newest-first' || value === 'oldest-first' ? value : undefined;
+}
+
+function parseLogOrder(value: unknown): LogOrder {
   return value === 'oldest-first' ? 'oldest-first' : 'newest-first';
 }
 
 function getDisplayLines(): LogLine[] {
   const filteredLines = applyFilters(state.lines, state.filters);
   return state.logOrder === 'newest-first' ? filteredLines.reverse() : filteredLines;
+}
+
+interface StoredUiPreferences {
+  filters: FiltersState;
+  theme: Theme;
+  logOrder: LogOrder;
+  autoScroll: ClientState['autoScroll'];
+  paused: ClientState['paused'];
 }
