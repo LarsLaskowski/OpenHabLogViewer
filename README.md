@@ -9,6 +9,7 @@ Live web UI for `events.log` and `openhab.log` built with Node.js, Express, and 
 - Visible per-source file states (`watching`, `missing`, `permission-denied`, `rotated`)
 - Browser-side filters for source, level, and text search
 - Pause, clear, auto-scroll, and theme switching
+- Stored UI preferences that survive a browser reload
 - Bounded browser and server buffers
 
 ## Configuration
@@ -64,6 +65,8 @@ After startup, the application automatically loads the latest configured lines f
 | `Auto-scroll` | Keeps the view pinned to the newest visible edge of the log list |
 | `Pause UI` | Stops rerendering in the browser only; data is still received |
 | `Clear browser buffer` | Clears the current browser view only; it does not clear the server buffer |
+
+Source, level, search text, theme, order, auto-scroll, and pause state are stored in the browser and restored after a reload.
 
 ### Status indicators
 
