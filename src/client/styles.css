@@ -302,8 +302,11 @@ body {
 }
 
 .log-line.continuation {
-  padding-left: 1rem;
-  border-left: 3px solid var(--continuation-border);
+  box-shadow: inset 3px 0 0 var(--continuation-border);
+}
+
+.placeholder-cell {
+  min-height: 1.2em;
 }
 
 .time-cell,
@@ -319,5 +322,9 @@ body {
 @media (max-width: 1100px) {
   .log-line {
     grid-template-columns: 1fr;
+  }
+
+  .log-line.continuation .placeholder-cell {
+    display: none;
   }
 }

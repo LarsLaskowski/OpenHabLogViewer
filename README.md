@@ -1,6 +1,6 @@
 # OpenHab Log Viewer
 
-Live web UI for `events.log` and `openhab.log` built with Node.js, Express, and Server-Sent Events. Every physical log file line stays visible as its own UI row; continuation lines are only visually grouped.
+Live web UI for `events.log` and `openhab.log` built with Node.js, Express, and Server-Sent Events. Every physical log file line stays visible as its own UI row; continuation lines stay grouped under their timestamped parent entry.
 
 ## Features
 
@@ -82,7 +82,7 @@ Source, level, search text, theme, order, auto-scroll, and pause state are store
 ### Log line rendering
 
 - Every physical log file line is rendered as its own visible row.
-- Continuation lines are never folded into the previous line.
+- Continuation lines stay on their own rows but render under the same log entry with empty metadata columns.
 - `events.log` and `openhab.log` remain visually distinct.
 - Newest entries are shown at the top by default, but users can switch back to oldest-first ordering.
 - Long content wraps instead of causing endless horizontal scrolling.
