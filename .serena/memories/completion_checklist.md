@@ -1,0 +1,1 @@
+After changes, run the existing validation commands only: npm run typecheck and npm run build. Do not introduce new tooling. Keep behavior backward-compatible unless the task explicitly changes UX, and update README only when directly affected.
