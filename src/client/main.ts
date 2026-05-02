@@ -163,5 +163,5 @@ function parseLogOrder(value: string | null): LogOrder {
 
 function getDisplayLines(): LogLine[] {
   const filteredLines = applyFilters(state.lines, state.filters);
-  return state.logOrder === 'newest-first' ? [...filteredLines].reverse() : filteredLines;
+  return state.logOrder === 'newest-first' ? filteredLines.reverse() : filteredLines;
 }
