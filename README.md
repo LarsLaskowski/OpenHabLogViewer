@@ -16,13 +16,13 @@ Live web UI for `events.log` and `openhab.log` built with Node.js, Express, and 
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `PORT` | `3000` | HTTP port used by the application |
+| `PORT` | `9001` | HTTP port used by the application |
 | `OPENHAB_LOG_DIR` | `/var/log/openhab` | Fallback directory for log files |
 | `EVENTS_LOG_PATH` | `/var/log/openhab/events.log` | Full path to `events.log` |
 | `OPENHAB_LOG_PATH` | `/var/log/openhab/openhab.log` | Full path to `openhab.log` |
 | `INITIAL_LINES_PER_FILE` | `500` | Number of latest lines per file included in bootstrap |
 | `MAX_BUFFERED_LINES` | `10000` | Maximum shared server-side ring buffer size |
-| `CLIENT_MAX_RENDERED_LINES` | `3000` | Maximum number of lines kept in the browser buffer |
+| `CLIENT_MAX_RENDERED_LINES` | `1500` | Maximum number of lines kept in the browser buffer |
 
 `EVENTS_LOG_PATH` and `OPENHAB_LOG_PATH` take precedence over `OPENHAB_LOG_DIR`.
 
@@ -47,7 +47,7 @@ Start locally:
 npm run start
 ```
 
-The application is then available at `http://localhost:3000`.
+The application is then available at `http://localhost:9001`.
 
 ## Usage
 
@@ -135,12 +135,12 @@ journalctl -u openhab-log-viewer -f
 You can optionally provide environment values in `/etc/default/openhab-log-viewer`, for example:
 
 ```ini
-PORT=3000
+PORT=9001
 EVENTS_LOG_PATH=/var/log/openhab/events.log
 OPENHAB_LOG_PATH=/var/log/openhab/openhab.log
 INITIAL_LINES_PER_FILE=500
 MAX_BUFFERED_LINES=10000
-CLIENT_MAX_RENDERED_LINES=3000
+CLIENT_MAX_RENDERED_LINES=1500
 ```
 
 Important: the service user must have read access to `/var/log/openhab/events.log` and `/var/log/openhab/openhab.log`.

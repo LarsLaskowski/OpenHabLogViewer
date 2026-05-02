@@ -6,12 +6,12 @@ After=network.target
 Type=simple
 User=openhab
 WorkingDirectory=/opt/openhab-log-viewer
-Environment=PORT=3000
+Environment=PORT=9001
 Environment=EVENTS_LOG_PATH=/var/log/openhab/events.log
 Environment=OPENHAB_LOG_PATH=/var/log/openhab/openhab.log
 Environment=INITIAL_LINES_PER_FILE=500
 Environment=MAX_BUFFERED_LINES=10000
-Environment=CLIENT_MAX_RENDERED_LINES=3000
+Environment=CLIENT_MAX_RENDERED_LINES=1500
 EnvironmentFile=-/etc/default/openhab-log-viewer
 ExecStart=/usr/bin/node dist/server/index.cjs
 Restart=always
