@@ -32,6 +32,9 @@
   --badge-muted-text: #475569;
   --log-bg: #ffffff;
   --log-border: rgba(203, 213, 225, 0.9);
+  --log-row-bg: #ffffff;
+  --log-row-text: #0f172a;
+  --log-row-muted: #475569;
   --continuation-border: rgba(100, 116, 139, 0.35);
 }
 
@@ -61,6 +64,9 @@
   --badge-muted-text: #cbd5e1;
   --log-bg: #020617;
   --log-border: rgba(51, 65, 85, 0.7);
+  --log-row-bg: #ffffff;
+  --log-row-text: #0f172a;
+  --log-row-muted: #475569;
   --continuation-border: rgba(148, 163, 184, 0.4);
 }
 
@@ -79,8 +85,8 @@ body {
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr);
   min-height: 100vh;
-  gap: 1rem;
-  padding: 1rem;
+  gap: 0.5rem;
+  padding: 0.5rem;
 }
 
 .topbar,
@@ -88,46 +94,63 @@ body {
 .source-status-panel {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1rem;
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
 }
 
 .topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
+}
+
+.topbar h1,
+.source-status-panel h2 {
+  margin: 0;
+  line-height: 1.2;
+}
+
+.topbar h1 {
+  font-size: 1.25rem;
+}
+
+.source-status-panel h2 {
+  font-size: 1rem;
 }
 
 .subtitle {
-  margin: 0.25rem 0 0;
+  margin: 0.1rem 0 0;
   color: var(--muted);
+  font-size: 0.85rem;
 }
 
 .controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem 1rem;
+  gap: 0.35rem 0.75rem;
   align-items: flex-end;
 }
 
 .controls label,
 .controls button {
   font: inherit;
+  font-size: 0.85rem;
 }
 
 .controls > label:not(.toggle) {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  gap: 0.35rem;
+  gap: 0.2rem;
 }
 
 .controls select,
 .controls input[type='search'],
 .controls button {
-  padding: 0.65rem 0.8rem;
-  border-radius: 8px;
+  min-height: 2rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--text);
@@ -144,9 +167,10 @@ body {
 .toggle {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.35rem;
   align-self: flex-end;
-  min-height: 2.7rem;
+  min-height: 2rem;
+  line-height: 1;
 }
 
 .controls button {
@@ -157,14 +181,15 @@ body {
 .status-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-  gap: 0.75rem;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
 }
 
 .status-card {
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--surface-2);
-  padding: 0.75rem;
+  padding: 0.5rem 0.6rem;
 }
 
 .status-card-title {
@@ -172,15 +197,15 @@ body {
 }
 
 .status-card-state {
-  margin-top: 0.35rem;
+  margin-top: 0.2rem;
   text-transform: uppercase;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
 }
 
 .status-card-message {
-  margin-top: 0.35rem;
+  margin-top: 0.2rem;
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.8rem;
 }
 
 .state-watching .status-card-state {
@@ -203,11 +228,12 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 5rem;
-  padding: 0.2rem 0.6rem;
+  min-width: 4.25rem;
+  padding: 0.12rem 0.45rem;
   border-radius: 999px;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   font-weight: 700;
+  line-height: 1.1;
 }
 
 .connection-connecting,
@@ -221,34 +247,34 @@ body {
   color: var(--status-success-text);
 }
 
-.source-events {
+.source-badge.source-events {
   background: var(--badge-events-bg);
   color: var(--badge-events-text);
 }
 
-.source-openhab {
+.source-badge.source-openhab {
   background: var(--badge-openhab-bg);
   color: var(--badge-openhab-text);
 }
 
-.level-error {
+.level-badge.level-error {
   background: var(--badge-error-bg);
   color: var(--badge-error-text);
 }
 
-.level-warn {
+.level-badge.level-warn {
   background: var(--badge-warn-bg);
   color: var(--badge-warn-text);
 }
 
-.level-info {
+.level-badge.level-info {
   background: var(--badge-info-bg);
   color: var(--badge-info-text);
 }
 
-.level-debug,
-.level-trace,
-.level-none {
+.level-badge.level-debug,
+.level-badge.level-trace,
+.level-badge.level-none {
   background: var(--badge-muted-bg);
   color: var(--badge-muted-text);
 }
@@ -257,29 +283,32 @@ body {
   min-height: 24rem;
   overflow: auto;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--log-bg);
 }
 
 .log-line {
   display: grid;
   grid-template-columns: 7rem 8rem 6rem minmax(12rem, 20rem) minmax(0, 1fr);
-  gap: 0.75rem;
+  gap: 0.45rem;
   align-items: start;
-  padding: 0.65rem 0.85rem;
+  padding: 0.3rem 0.55rem;
+  background: var(--log-row-bg);
+  color: var(--log-row-text);
   border-bottom: 1px solid var(--log-border);
   font-family: Consolas, "Courier New", monospace;
-  font-size: 0.88rem;
+  font-size: 0.78rem;
+  line-height: 1.2;
 }
 
 .log-line.continuation {
-  padding-left: 1.5rem;
-  border-left: 4px solid var(--continuation-border);
+  padding-left: 1rem;
+  border-left: 3px solid var(--continuation-border);
 }
 
 .time-cell,
 .logger-cell {
-  color: var(--muted);
+  color: var(--log-row-muted);
 }
 
 .message-cell {
