@@ -17,6 +17,7 @@ const THEME_STORAGE_KEY = 'openhab-log-viewer.theme';
 const LOG_ORDER_STORAGE_KEY = 'openhab-log-viewer.log-order';
 
 const connectionStatusElement = getRequiredElement('connection-status');
+const controlsElement = getRequiredElement('controls-panel');
 const sourceStatusListElement = getRequiredElement('source-status-list');
 const logContainerElement = getRequiredElement('log-container');
 const sourceFilterElement = getRequiredInput<HTMLSelectElement>('source-filter');
@@ -33,6 +34,7 @@ void bootstrap();
 async function bootstrap(): Promise<void> {
   applyStoredPreferences(loadStoredPreferences());
   applyTheme(state.theme);
+  applyLogOrderLayout(state.logOrder);
   syncControlsFromState();
   renderConnectionStatus(connectionStatusElement, state.connectionState);
 
@@ -77,6 +79,7 @@ function bindControls(): void {
 
   orderSelectElement.addEventListener('change', () => {
     state.logOrder = parseLogOrder(orderSelectElement.value);
+    applyLogOrderLayout(state.logOrder);
     persistPreferences();
     renderAll();
   });
@@ -262,6 +265,10 @@ function parseTheme(value: unknown): Theme {
 
 function applyTheme(theme: Theme): void {
   document.documentElement.dataset.theme = theme;
+}
+
+function applyLogOrderLayout(logOrder: LogOrder): void {
+  controlsElement.classList.toggle('sticky-oldest-first', logOrder === 'oldest-first');
 }
 
 function loadStoredLogOrder(): LogOrder {
