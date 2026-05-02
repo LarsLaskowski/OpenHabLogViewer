@@ -239,8 +239,9 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 4.25rem;
-  padding: 0.12rem 0.45rem;
+  min-width: 3.75rem;
+  max-width: 100%;
+  padding: 0.12rem 0.35rem;
   border-radius: 999px;
   font-size: 0.72rem;
   font-weight: 700;
@@ -300,10 +301,10 @@ body {
 
 .log-line {
   display: grid;
-  grid-template-columns: 7rem 8rem 6rem minmax(12rem, 20rem) minmax(0, 1fr);
-  gap: 0.45rem;
+  grid-template-columns: 6.5rem 6.75rem 5.25rem minmax(9rem, 14rem) minmax(0, 1fr);
+  gap: 0.3rem;
   align-items: start;
-  padding: 0.3rem 0.55rem;
+  padding: 0.28rem 0.45rem;
   background: var(--log-row-bg);
   color: var(--log-row-text);
   border-bottom: 1px solid var(--log-border);
@@ -323,6 +324,29 @@ body {
 .time-cell,
 .logger-cell {
   color: var(--log-row-muted);
+}
+
+.time-cell,
+.source-cell,
+.level-cell,
+.logger-cell,
+.message-cell {
+  min-width: 0;
+}
+
+.source-cell,
+.level-cell {
+  display: flex;
+  align-items: flex-start;
+}
+
+.source-badge,
+.level-badge {
+  overflow-wrap: anywhere;
+}
+
+.logger-cell {
+  overflow-wrap: anywhere;
 }
 
 .message-cell {

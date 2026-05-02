@@ -76,11 +76,16 @@ function createLogLineElement(line: LogLine): HTMLElement {
       createMessageCell(line)
     );
   } else {
+    const timestampLabel = line.timestamp ? formatTimestamp(line.timestamp) : '—';
+    const timestampTooltip = line.timestamp ? formatTimestampTooltip(line.timestamp) : undefined;
+    const loggerLabel = formatLoggerLabel(line.logger);
+    const loggerTooltip = line.logger && loggerLabel !== line.logger ? line.logger : undefined;
+
     row.append(
-      createCell('time-cell', line.timestamp ? formatTimestamp(line.timestamp) : '—'),
+      createCell('time-cell', timestampLabel, timestampTooltip),
       createBadgeCell('source-cell', line.fileName, `source-badge source-${line.source}`),
       createBadgeCell('level-cell', line.level ?? '—', `level-badge ${line.level ? `level-${line.level.toLowerCase()}` : 'level-none'}`),
-      createCell('logger-cell', line.logger ?? '—'),
+      createCell('logger-cell', loggerLabel, loggerTooltip),
       createMessageCell(line)
     );
   }
@@ -88,10 +93,13 @@ function createLogLineElement(line: LogLine): HTMLElement {
   return row;
 }
 
-function createCell(className: string, text: string): HTMLElement {
+function createCell(className: string, text: string, title?: string): HTMLElement {
   const element = document.createElement('div');
   element.className = className;
   element.textContent = text;
+  if (title) {
+    element.title = title;
+  }
   return element;
 }
 
@@ -131,3 +139,77 @@ function formatTimestamp(value: string): string {
     date.getSeconds()
   ).padStart(2, '0')}.${String(date.getMilliseconds()).padStart(3, '0')}`;
 }
+
+function formatTimestampTooltip(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return `${date.toLocaleDateString()} ${formatTimestamp(value)}`;
+}
+
+function formatLoggerLabel(logger: string | null): string {
+  if (!logger) {
+    return '—';
+  }
+
+  const normalizedLogger = logger.trim();
+  const lastSegment = getLastSegment(normalizedLogger);
+  const mappedLabel = LOGGER_LABELS[lastSegment];
+
+  if (mappedLabel) {
+    return mappedLabel;
+  }
+
+  const scriptName = extractScriptName(normalizedLogger);
+  if (scriptName) {
+    return scriptName;
+  }
+
+  if (lastSegment.endsWith('Event')) {
+    return humanizePascalCase(lastSegment.slice(0, -'Event'.length));
+  }
+
+  if (looksLikeTypeName(lastSegment)) {
+    return humanizePascalCase(lastSegment);
+  }
+
+  return normalizedLogger;
+}
+
+function extractScriptName(logger: string): string | null {
+  const markerIndex = logger.lastIndexOf('core.model.script.');
+  if (markerIndex < 0) {
+    return null;
+  }
+
+  const scriptName = logger.slice(markerIndex + 'core.model.script.'.length).trim();
+  return scriptName || null;
+}
+
+function getLastSegment(value: string): string {
+  const trimmed = value.trim();
+  const parts = trimmed.split('.');
+  return parts.at(-1)?.trim() ?? trimmed;
+}
+
+function humanizePascalCase(value: string): string {
+  return value
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .trim();
+}
+
+function looksLikeTypeName(value: string): boolean {
+  return /^[A-Z][A-Za-z0-9]+$/.test(value);
+}
+
+const LOGGER_LABELS: Record<string, string> = {
+  ChannelTriggeredEvent: 'Channel triggered',
+  InboxRemovedEvent: 'Inbox entry removed',
+  ItemCommandEvent: 'Item command',
+  ItemStateChangedEvent: 'Item state changed',
+  ItemStatePredictedEvent: 'Item state predicted',
+  ThingStatusInfoChangedEvent: 'Thing status changed'
+};
