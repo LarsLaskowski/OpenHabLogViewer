@@ -29,7 +29,7 @@ const autoScrollElement = getRequiredInput<HTMLInputElement>('auto-scroll');
 const pauseToggleElement = getRequiredInput<HTMLInputElement>('pause-toggle');
 const clearButtonElement = getRequiredInput<HTMLButtonElement>('clear-button');
 const faviconElement = getRequiredLink('app-favicon');
-const brandImageElement = getRequiredInput<HTMLImageElement>('app-brand-image');
+const brandImageElement = getRequiredImage('app-brand-image');
 
 void bootstrap();
 
@@ -155,6 +155,15 @@ function getRequiredElement(id: string): HTMLElement {
 
 function getRequiredInput<T extends HTMLElement>(id: string): T {
   return getRequiredElement(id) as T;
+}
+
+function getRequiredImage(id: string): HTMLImageElement {
+  const element = getRequiredElement(id);
+  if (!(element instanceof HTMLImageElement)) {
+    throw new Error(`Expected image element: ${id}`);
+  }
+
+  return element;
 }
 
 function getRequiredLink(id: string): HTMLLinkElement {
