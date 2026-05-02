@@ -60,7 +60,8 @@ After startup, the application automatically loads the latest configured lines f
 | `Level` | Filters by `TRACE`, `DEBUG`, `INFO`, `WARN`, or `ERROR` |
 | `Search` | Searches `rawLine` using a case-insensitive substring match |
 | `Theme` | Switches between Light and Dark; Light is the default |
-| `Auto-scroll` | Keeps the view pinned to the latest log entries |
+| `Order` | Switches between `Newest first` and `Oldest first`; newest-first is the default |
+| `Auto-scroll` | Keeps the view pinned to the newest visible edge of the log list |
 | `Pause UI` | Stops rerendering in the browser only; data is still received |
 | `Clear browser buffer` | Clears the current browser view only; it does not clear the server buffer |
 
@@ -80,6 +81,7 @@ After startup, the application automatically loads the latest configured lines f
 - Every physical log file line is rendered as its own visible row.
 - Continuation lines are never folded into the previous line.
 - `events.log` and `openhab.log` remain visually distinct.
+- Newest entries are shown at the top by default, but users can switch back to oldest-first ordering.
 - Long content wraps instead of causing endless horizontal scrolling.
 
 ## Deploy package and copy deployment

@@ -1,9 +1,10 @@
 import { applyFilters } from './filters.js';
 import { renderConnectionStatus, renderLogLines, renderSourceStatuses } from './render.js';
-import { BootstrapResponse, LogLine, SourceStatus, Theme, createInitialState } from './state.js';
+import { BootstrapResponse, LogLine, LogOrder, SourceStatus, Theme, createInitialState } from './state.js';
 
 const state = createInitialState();
 const THEME_STORAGE_KEY = 'openhab-log-viewer.theme';
+const LOG_ORDER_STORAGE_KEY = 'openhab-log-viewer.log-order';
 
 const connectionStatusElement = getRequiredElement('connection-status');
 const sourceStatusListElement = getRequiredElement('source-status-list');
@@ -12,6 +13,7 @@ const sourceFilterElement = getRequiredInput<HTMLSelectElement>('source-filter')
 const levelFilterElement = getRequiredInput<HTMLSelectElement>('level-filter');
 const textFilterElement = getRequiredInput<HTMLInputElement>('text-filter');
 const themeSelectElement = getRequiredInput<HTMLSelectElement>('theme-select');
+const orderSelectElement = getRequiredInput<HTMLSelectElement>('order-select');
 const autoScrollElement = getRequiredInput<HTMLInputElement>('auto-scroll');
 const pauseToggleElement = getRequiredInput<HTMLInputElement>('pause-toggle');
 const clearButtonElement = getRequiredInput<HTMLButtonElement>('clear-button');
@@ -20,8 +22,10 @@ void bootstrap();
 
 async function bootstrap(): Promise<void> {
   state.theme = loadStoredTheme();
+  state.logOrder = loadStoredLogOrder();
   applyTheme(state.theme);
   themeSelectElement.value = state.theme;
+  orderSelectElement.value = state.logOrder;
   renderConnectionStatus(connectionStatusElement, state.connectionState);
 
   const response = await fetch('/api/bootstrap');
@@ -58,6 +62,12 @@ function bindControls(): void {
     state.theme = parseTheme(themeSelectElement.value);
     applyTheme(state.theme);
     localStorage.setItem(THEME_STORAGE_KEY, state.theme);
+  });
+
+  orderSelectElement.addEventListener('change', () => {
+    state.logOrder = parseLogOrder(orderSelectElement.value);
+    localStorage.setItem(LOG_ORDER_STORAGE_KEY, state.logOrder);
+    renderAll();
   });
 
   autoScrollElement.addEventListener('change', () => {
@@ -105,7 +115,7 @@ function connectStream(): void {
     }
 
     if (!state.paused) {
-      renderLogLines(logContainerElement, applyFilters(state.lines, state.filters), state.autoScroll);
+      renderLogLines(logContainerElement, getDisplayLines(), state.autoScroll, state.logOrder);
     }
   });
 }
@@ -113,7 +123,7 @@ function connectStream(): void {
 function renderAll(): void {
   renderConnectionStatus(connectionStatusElement, state.connectionState);
   renderSourceStatuses(sourceStatusListElement, Object.values(state.statuses));
-  renderLogLines(logContainerElement, applyFilters(state.lines, state.filters), state.autoScroll);
+  renderLogLines(logContainerElement, getDisplayLines(), state.autoScroll, state.logOrder);
 }
 
 function getRequiredElement(id: string): HTMLElement {
@@ -140,4 +150,18 @@ function parseTheme(value: string | null): Theme {
 
 function applyTheme(theme: Theme): void {
   document.documentElement.dataset.theme = theme;
+}
+
+function loadStoredLogOrder(): LogOrder {
+  const storedValue = localStorage.getItem(LOG_ORDER_STORAGE_KEY);
+  return parseLogOrder(storedValue);
+}
+
+function parseLogOrder(value: string | null): LogOrder {
+  return value === 'oldest-first' ? 'oldest-first' : 'newest-first';
+}
+
+function getDisplayLines(): LogLine[] {
+  const filteredLines = applyFilters(state.lines, state.filters);
+  return state.logOrder === 'newest-first' ? [...filteredLines].reverse() : filteredLines;
 }

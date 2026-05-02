@@ -1,4 +1,4 @@
-import { ConnectionState, LogLine, SourceStatus } from './state.js';
+import { ConnectionState, LogLine, LogOrder, SourceStatus } from './state.js';
 
 export function renderConnectionStatus(target: HTMLElement, connectionState: ConnectionState): void {
   target.className = `connection-badge connection-${connectionState}`;
@@ -37,7 +37,7 @@ export function renderSourceStatuses(target: HTMLElement, statuses: SourceStatus
   target.append(fragment);
 }
 
-export function renderLogLines(target: HTMLElement, lines: LogLine[], autoScroll: boolean): void {
+export function renderLogLines(target: HTMLElement, lines: LogLine[], autoScroll: boolean, logOrder: LogOrder): void {
   const previousScrollTop = target.scrollTop;
   target.textContent = '';
 
@@ -49,7 +49,7 @@ export function renderLogLines(target: HTMLElement, lines: LogLine[], autoScroll
   target.append(fragment);
 
   if (autoScroll) {
-    target.scrollTop = target.scrollHeight;
+    target.scrollTop = logOrder === 'newest-first' ? 0 : target.scrollHeight;
   } else {
     target.scrollTop = previousScrollTop;
   }

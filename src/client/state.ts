@@ -3,6 +3,7 @@ export type LogSource = 'events' | 'openhab';
 export type SourceState = 'idle' | 'watching' | 'missing' | 'permission-denied' | 'rotated' | 'error';
 export type ConnectionState = 'connecting' | 'connected' | 'reconnecting';
 export type Theme = 'light' | 'dark';
+export type LogOrder = 'newest-first' | 'oldest-first';
 
 export interface LogLine {
   id: number;
@@ -52,6 +53,7 @@ export interface ClientState {
   autoScroll: boolean;
   clientMaxRenderedLines: number;
   theme: Theme;
+  logOrder: LogOrder;
 }
 
 export function createInitialState(): ClientState {
@@ -70,7 +72,8 @@ export function createInitialState(): ClientState {
     paused: false,
     autoScroll: true,
     clientMaxRenderedLines: 3000,
-    theme: 'light'
+    theme: 'light',
+    logOrder: 'newest-first'
   };
 }
 
