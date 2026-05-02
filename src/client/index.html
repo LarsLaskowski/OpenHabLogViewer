@@ -4,14 +4,25 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>OpenHab Log Viewer</title>
+    <link id="app-favicon" rel="icon" type="image/svg+xml" href="./assets/openHAB_appicon.svg" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <div>
-          <h1>OpenHab Log Viewer</h1>
-          <p class="subtitle">Live view for events.log and openhab.log</p>
+        <div class="brand">
+          <img
+            id="app-brand-image"
+            class="brand-image"
+            src="./assets/openHAB_workswith.svg"
+            alt="openHAB logo"
+            width="180"
+            height="48"
+          />
+          <div class="brand-copy">
+            <h1>OpenHab Log Viewer</h1>
+            <p class="subtitle">Live view for events.log and openhab.log</p>
+          </div>
         </div>
         <div id="connection-status" class="connection-badge connection-connecting">Connecting</div>
       </header>

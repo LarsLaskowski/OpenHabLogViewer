@@ -66,9 +66,9 @@
   --badge-muted-text: #cbd5e1;
   --log-bg: #020617;
   --log-border: rgba(51, 65, 85, 0.7);
-  --log-row-bg: #ffffff;
-  --log-row-text: #0f172a;
-  --log-row-muted: #475569;
+  --log-row-bg: #0f172a;
+  --log-row-text: #e5e7eb;
+  --log-row-muted: #94a3b8;
   --continuation-border: rgba(148, 163, 184, 0.4);
 }
 
@@ -105,6 +105,24 @@ body {
   justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.brand-copy {
+  min-width: 0;
+}
+
+.brand-image {
+  width: auto;
+  height: 2.25rem;
+  flex: 0 0 auto;
+  display: block;
 }
 
 .topbar h1,

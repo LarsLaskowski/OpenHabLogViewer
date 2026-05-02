@@ -71,7 +71,7 @@ export function createInitialState(): ClientState {
     },
     paused: false,
     autoScroll: true,
-    clientMaxRenderedLines: 3000,
+    clientMaxRenderedLines: 1500,
     theme: 'light',
     logOrder: 'newest-first'
   };

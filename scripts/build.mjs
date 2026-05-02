@@ -7,10 +7,12 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const distDir = path.join(rootDir, 'dist');
 const clientDistDir = path.join(distDir, 'client');
 const serverDistDir = path.join(distDir, 'server');
+const clientAssetsDir = path.join(clientDistDir, 'assets');
 
 await rm(distDir, { recursive: true, force: true });
 await mkdir(clientDistDir, { recursive: true });
 await mkdir(serverDistDir, { recursive: true });
+await mkdir(clientAssetsDir, { recursive: true });
 
 await build({
   entryPoints: [path.join(rootDir, 'src', 'server', 'index.ts')],
@@ -36,3 +38,13 @@ await build({
 
 await cp(path.join(rootDir, 'src', 'client', 'index.html'), path.join(clientDistDir, 'index.html'));
 await cp(path.join(rootDir, 'src', 'client', 'styles.css'), path.join(clientDistDir, 'styles.css'));
+await cp(path.join(rootDir, 'src', 'assets', 'openHAB_appicon.svg'), path.join(clientAssetsDir, 'openHAB_appicon.svg'));
+await cp(
+  path.join(rootDir, 'src', 'assets', 'openHAB_darkBG_appicon.svg'),
+  path.join(clientAssetsDir, 'openHAB_darkBG_appicon.svg')
+);
+await cp(path.join(rootDir, 'src', 'assets', 'openHAB_workswith.svg'), path.join(clientAssetsDir, 'openHAB_workswith.svg'));
+await cp(
+  path.join(rootDir, 'src', 'assets', 'openHAB_workswith_darkBG.svg'),
+  path.join(clientAssetsDir, 'openHAB_workswith_darkBG.svg')
+);

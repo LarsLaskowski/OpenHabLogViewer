@@ -28,6 +28,8 @@ const orderSelectElement = getRequiredInput<HTMLSelectElement>('order-select');
 const autoScrollElement = getRequiredInput<HTMLInputElement>('auto-scroll');
 const pauseToggleElement = getRequiredInput<HTMLInputElement>('pause-toggle');
 const clearButtonElement = getRequiredInput<HTMLButtonElement>('clear-button');
+const faviconElement = getRequiredLink('app-favicon');
+const brandImageElement = getRequiredInput<HTMLImageElement>('app-brand-image');
 
 void bootstrap();
 
@@ -155,6 +157,15 @@ function getRequiredInput<T extends HTMLElement>(id: string): T {
   return getRequiredElement(id) as T;
 }
 
+function getRequiredLink(id: string): HTMLLinkElement {
+  const element = getRequiredElement(id);
+  if (!(element instanceof HTMLLinkElement)) {
+    throw new Error(`Expected link element: ${id}`);
+  }
+
+  return element;
+}
+
 function applyStoredPreferences(preferences: StoredUiPreferences): void {
   state.filters = preferences.filters;
   state.theme = preferences.theme;
@@ -265,6 +276,8 @@ function parseTheme(value: unknown): Theme {
 
 function applyTheme(theme: Theme): void {
   document.documentElement.dataset.theme = theme;
+  faviconElement.href = theme === 'dark' ? './assets/openHAB_darkBG_appicon.svg' : './assets/openHAB_appicon.svg';
+  brandImageElement.src = theme === 'dark' ? './assets/openHAB_workswith_darkBG.svg' : './assets/openHAB_workswith.svg';
 }
 
 function applyLogOrderLayout(logOrder: LogOrder): void {
