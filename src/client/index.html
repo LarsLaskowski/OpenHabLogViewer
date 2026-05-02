@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenHab Log Viewer</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>OpenHab Log Viewer</h1>
+          <p class="subtitle">Live view for events.log and openhab.log</p>
+        </div>
+        <div id="connection-status" class="connection-badge connection-connecting">Connecting</div>
+      </header>
+
+      <section class="controls">
+        <label>
+          Source
+          <select id="source-filter">
+            <option value="all">Both</option>
+            <option value="events">events.log</option>
+            <option value="openhab">openhab.log</option>
+          </select>
+        </label>
+
+        <label>
+          Level
+          <select id="level-filter">
+            <option value="all">All</option>
+            <option value="TRACE">TRACE</option>
+            <option value="DEBUG">DEBUG</option>
+            <option value="INFO">INFO</option>
+            <option value="WARN">WARN</option>
+            <option value="ERROR">ERROR</option>
+          </select>
+        </label>
+
+        <label class="search-control">
+          Search
+          <input id="text-filter" type="search" placeholder="Filter raw log lines" />
+        </label>
+
+        <label>
+          Theme
+          <select id="theme-select">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
+
+        <label class="toggle">
+          <input id="auto-scroll" type="checkbox" checked />
+          <span>Auto-scroll</span>
+        </label>
+
+        <label class="toggle">
+          <input id="pause-toggle" type="checkbox" />
+          <span>Pause UI</span>
+        </label>
+
+        <button id="clear-button" type="button">Clear browser buffer</button>
+      </section>
+
+      <section class="source-status-panel">
+        <h2>Source status</h2>
+        <div id="source-status-list" class="status-list"></div>
+      </section>
+
+      <main id="log-container" class="log-container" aria-live="polite"></main>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

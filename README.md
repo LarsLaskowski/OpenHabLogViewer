@@ -1,0 +1,147 @@
+# OpenHab Log Viewer
+
+Live web UI for `events.log` and `openhab.log` built with Node.js, Express, and Server-Sent Events. Every physical log file line stays visible as its own UI row; continuation lines are only visually grouped.
+
+## Features
+
+- Initial load of the latest configured lines from `events.log` and `openhab.log`
+- Live streaming of new lines via SSE
+- Visible per-source file states (`watching`, `missing`, `permission-denied`, `rotated`)
+- Browser-side filters for source, level, and text search
+- Pause, clear, auto-scroll, and theme switching
+- Bounded browser and server buffers
+
+## Configuration
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PORT` | `3000` | HTTP port used by the application |
+| `OPENHAB_LOG_DIR` | `/var/log/openhab` | Fallback directory for log files |
+| `EVENTS_LOG_PATH` | `/var/log/openhab/events.log` | Full path to `events.log` |
+| `OPENHAB_LOG_PATH` | `/var/log/openhab/openhab.log` | Full path to `openhab.log` |
+| `INITIAL_LINES_PER_FILE` | `500` | Number of latest lines per file included in bootstrap |
+| `MAX_BUFFERED_LINES` | `10000` | Maximum shared server-side ring buffer size |
+| `CLIENT_MAX_RENDERED_LINES` | `3000` | Maximum number of lines kept in the browser buffer |
+
+`EVENTS_LOG_PATH` and `OPENHAB_LOG_PATH` take precedence over `OPENHAB_LOG_DIR`.
+
+## Development and build
+
+```bash
+npm install
+npm run build
+```
+
+The build creates:
+
+```text
+dist/
+  client/
+  server/
+```
+
+Start locally:
+
+```bash
+npm run start
+```
+
+The application is then available at `http://localhost:3000`.
+
+## Usage
+
+After startup, the application automatically loads the latest configured lines from `events.log` and `openhab.log`, then connects to the live SSE stream.
+
+### UI controls
+
+| Element | Purpose |
+| --- | --- |
+| `Source` | Filters between both files, only `events.log`, or only `openhab.log` |
+| `Level` | Filters by `TRACE`, `DEBUG`, `INFO`, `WARN`, or `ERROR` |
+| `Search` | Searches `rawLine` using a case-insensitive substring match |
+| `Theme` | Switches between Light and Dark; Light is the default |
+| `Auto-scroll` | Keeps the view pinned to the latest log entries |
+| `Pause UI` | Stops rerendering in the browser only; data is still received |
+| `Clear browser buffer` | Clears the current browser view only; it does not clear the server buffer |
+
+### Status indicators
+
+- **Connecting / Reconnecting / Connected** show the browser-to-server connection state.
+- The **Source status** section shows the current state of each watched file.
+- Typical states:
+  - `watching`: file is being tailed normally
+  - `missing`: file was not found
+  - `permission-denied`: file exists but cannot be read
+  - `rotated`: log rotation or truncation was detected and the file was reattached
+  - `error`: another file-related error occurred
+
+### Log line rendering
+
+- Every physical log file line is rendered as its own visible row.
+- Continuation lines are never folded into the previous line.
+- `events.log` and `openhab.log` remain visually distinct.
+- Long content wraps instead of causing endless horizontal scrolling.
+
+## Deploy package and copy deployment
+
+Preferred deployment flow:
+
+1. Develop the project externally
+2. Run `npm install` and `npm run build`
+3. Copy the following artifacts to the target host:
+
+```text
+deploy-package/
+  dist/
+    client/
+    server/
+  package.json
+  package-lock.json
+  deploy/
+    systemd/
+      openhab-log-viewer.service
+  README.md
+```
+
+Because the server is bundled to `dist/server/index.cjs`, the target host only needs Node.js at runtime.
+
+## systemd installation on Linux
+
+The first version is designed for systemd-based operation. `deploy/systemd/openhab-log-viewer.service` assumes the application is installed in `/opt/openhab-log-viewer`.
+
+Example for copying the deploy package to the target host:
+
+```bash
+scp -r deploy-package/ user@host:/tmp/openhab-log-viewer
+sudo mkdir -p /opt/openhab-log-viewer
+sudo cp -r /tmp/openhab-log-viewer/* /opt/openhab-log-viewer/
+```
+
+Install the service:
+
+```bash
+sudo cp deploy/systemd/openhab-log-viewer.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now openhab-log-viewer
+sudo systemctl status openhab-log-viewer
+journalctl -u openhab-log-viewer -f
+```
+
+You can optionally provide environment values in `/etc/default/openhab-log-viewer`, for example:
+
+```ini
+PORT=3000
+EVENTS_LOG_PATH=/var/log/openhab/events.log
+OPENHAB_LOG_PATH=/var/log/openhab/openhab.log
+INITIAL_LINES_PER_FILE=500
+MAX_BUFFERED_LINES=10000
+CLIENT_MAX_RENDERED_LINES=3000
+```
+
+Important: the service user must have read access to `/var/log/openhab/events.log` and `/var/log/openhab/openhab.log`.
+
+## Operating notes
+
+- The application is intended for home-network use or use behind a reverse proxy.
+- Built-in authentication is intentionally not part of the first version.
+- If external access is required, add authentication in front of the app via Nginx, Caddy, or Traefik.

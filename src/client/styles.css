@@ -1,0 +1,294 @@
+:root {
+  color-scheme: light;
+  --bg: #f3f7fb;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --border: #cbd5e1;
+  --text: #0f172a;
+  --muted: #475569;
+  --events: #0891b2;
+  --openhab: #d97706;
+  --error: #dc2626;
+  --warn: #f59e0b;
+  --info: #2563eb;
+  --debug: #64748b;
+  --trace: #475569;
+  --ok: #16a34a;
+  --status-warning-bg: rgba(245, 158, 11, 0.12);
+  --status-warning-text: #b45309;
+  --status-success-bg: rgba(22, 163, 74, 0.12);
+  --status-success-text: #15803d;
+  --badge-events-bg: rgba(8, 145, 178, 0.12);
+  --badge-events-text: #0f766e;
+  --badge-openhab-bg: rgba(217, 119, 6, 0.14);
+  --badge-openhab-text: #b45309;
+  --badge-error-bg: rgba(220, 38, 38, 0.12);
+  --badge-error-text: #b91c1c;
+  --badge-warn-bg: rgba(245, 158, 11, 0.12);
+  --badge-warn-text: #b45309;
+  --badge-info-bg: rgba(37, 99, 235, 0.12);
+  --badge-info-text: #1d4ed8;
+  --badge-muted-bg: rgba(100, 116, 139, 0.12);
+  --badge-muted-text: #475569;
+  --log-bg: #ffffff;
+  --log-border: rgba(203, 213, 225, 0.9);
+  --continuation-border: rgba(100, 116, 139, 0.35);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #111827;
+  --surface: #1f2937;
+  --surface-2: #0f172a;
+  --border: #334155;
+  --text: #e5e7eb;
+  --muted: #94a3b8;
+  --status-warning-bg: rgba(245, 158, 11, 0.16);
+  --status-warning-text: #fcd34d;
+  --status-success-bg: rgba(22, 163, 74, 0.16);
+  --status-success-text: #86efac;
+  --badge-events-bg: rgba(8, 145, 178, 0.16);
+  --badge-events-text: #67e8f9;
+  --badge-openhab-bg: rgba(217, 119, 6, 0.16);
+  --badge-openhab-text: #fdba74;
+  --badge-error-bg: rgba(220, 38, 38, 0.16);
+  --badge-error-text: #fca5a5;
+  --badge-warn-bg: rgba(245, 158, 11, 0.16);
+  --badge-warn-text: #fcd34d;
+  --badge-info-bg: rgba(37, 99, 235, 0.16);
+  --badge-info-text: #93c5fd;
+  --badge-muted-bg: rgba(100, 116, 139, 0.16);
+  --badge-muted-text: #cbd5e1;
+  --log-bg: #020617;
+  --log-border: rgba(51, 65, 85, 0.7);
+  --continuation-border: rgba(148, 163, 184, 0.4);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app-shell {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  min-height: 100vh;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.topbar,
+.controls,
+.source-status-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.subtitle {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: flex-end;
+}
+
+.controls label,
+.controls button {
+  font: inherit;
+}
+
+.controls > label:not(.toggle) {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.controls select,
+.controls input[type='search'],
+.controls button {
+  padding: 0.65rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.search-control {
+  flex: 1 1 18rem;
+}
+
+.search-control input {
+  width: 100%;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  align-self: flex-end;
+  min-height: 2.7rem;
+}
+
+.controls button {
+  align-self: flex-end;
+  cursor: pointer;
+}
+
+.status-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.75rem;
+}
+
+.status-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  padding: 0.75rem;
+}
+
+.status-card-title {
+  font-weight: 700;
+}
+
+.status-card-state {
+  margin-top: 0.35rem;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+}
+
+.status-card-message {
+  margin-top: 0.35rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.state-watching .status-card-state {
+  color: var(--ok);
+}
+
+.state-missing .status-card-state,
+.state-permission-denied .status-card-state,
+.state-error .status-card-state {
+  color: #f87171;
+}
+
+.state-rotated .status-card-state {
+  color: var(--warn);
+}
+
+.connection-badge,
+.source-badge,
+.level-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 5rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.connection-connecting,
+.connection-reconnecting {
+  background: var(--status-warning-bg);
+  color: var(--status-warning-text);
+}
+
+.connection-connected {
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+}
+
+.source-events {
+  background: var(--badge-events-bg);
+  color: var(--badge-events-text);
+}
+
+.source-openhab {
+  background: var(--badge-openhab-bg);
+  color: var(--badge-openhab-text);
+}
+
+.level-error {
+  background: var(--badge-error-bg);
+  color: var(--badge-error-text);
+}
+
+.level-warn {
+  background: var(--badge-warn-bg);
+  color: var(--badge-warn-text);
+}
+
+.level-info {
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+}
+
+.level-debug,
+.level-trace,
+.level-none {
+  background: var(--badge-muted-bg);
+  color: var(--badge-muted-text);
+}
+
+.log-container {
+  min-height: 24rem;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--log-bg);
+}
+
+.log-line {
+  display: grid;
+  grid-template-columns: 7rem 8rem 6rem minmax(12rem, 20rem) minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--log-border);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.88rem;
+}
+
+.log-line.continuation {
+  padding-left: 1.5rem;
+  border-left: 4px solid var(--continuation-border);
+}
+
+.time-cell,
+.logger-cell {
+  color: var(--muted);
+}
+
+.message-cell {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1100px) {
+  .log-line {
+    grid-template-columns: 1fr;
+  }
+}
