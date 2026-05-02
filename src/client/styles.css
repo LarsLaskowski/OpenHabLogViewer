@@ -3,6 +3,7 @@
   --bg: #f3f7fb;
   --surface: #ffffff;
   --surface-2: #f8fafc;
+  --surface-sticky: rgba(255, 255, 255, 0.82);
   --border: #cbd5e1;
   --text: #0f172a;
   --muted: #475569;
@@ -43,6 +44,7 @@
   --bg: #111827;
   --surface: #1f2937;
   --surface-2: #0f172a;
+  --surface-sticky: rgba(31, 41, 55, 0.82);
   --border: #334155;
   --text: #e5e7eb;
   --muted: #94a3b8;
@@ -130,6 +132,15 @@ body {
   flex-wrap: wrap;
   gap: 0.35rem 0.75rem;
   align-items: flex-end;
+}
+
+.controls.sticky-oldest-first {
+  position: sticky;
+  top: 0.5rem;
+  z-index: 10;
+  background: var(--surface-sticky);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
 }
 
 .controls label,

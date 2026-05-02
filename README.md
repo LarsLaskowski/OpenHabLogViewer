@@ -61,7 +61,7 @@ After startup, the application automatically loads the latest configured lines f
 | `Level` | Filters by `TRACE`, `DEBUG`, `INFO`, `WARN`, or `ERROR` |
 | `Search` | Searches `rawLine` using a case-insensitive substring match |
 | `Theme` | Switches between Light and Dark; Light is the default |
-| `Order` | Switches between `Newest first` and `Oldest first`; newest-first is the default |
+| `Order` | Switches between `Newest first` and `Oldest first`; newest-first is the default. In `Oldest first`, the controls panel stays sticky and slightly transparent while scrolling. |
 | `Auto-scroll` | Keeps the view pinned to the newest visible edge of the log list |
 | `Pause UI` | Stops rerendering in the browser only; data is still received |
 | `Clear browser buffer` | Clears the current browser view only; it does not clear the server buffer |
