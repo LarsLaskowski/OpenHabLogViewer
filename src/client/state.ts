@@ -4,6 +4,7 @@ export type SourceState = 'idle' | 'watching' | 'missing' | 'permission-denied' 
 export type ConnectionState = 'connecting' | 'connected' | 'reconnecting';
 export type Theme = 'light' | 'dark';
 export type LogOrder = 'newest-first' | 'oldest-first';
+export const CLIENT_MAX_RENDERED_LINES_CAP = 500;
 
 export interface LogLine {
   id: number;
@@ -29,12 +30,36 @@ export interface SourceStatus {
   updatedAt: string;
 }
 
+export interface SyncCursor {
+  oldestAvailableId: number | null;
+  newestAvailableId: number | null;
+  lastIncludedId: number | null;
+  limit: number;
+  totalBufferedLines: number;
+  truncated: boolean;
+}
+
+export type ResyncMode = 'append' | 'reset';
+export type ResyncResetReason = 'cursor-not-available' | 'limit-exceeded' | null;
+
 export interface BootstrapResponse {
   lines: LogLine[];
   statuses: SourceStatus[];
   config: {
     clientMaxRenderedLines: number;
     initialLinesPerFile: number;
+    serverMaxSyncLines: number;
+  };
+  cursor: SyncCursor;
+}
+
+export interface ResyncResponse {
+  lines: LogLine[];
+  statuses: SourceStatus[];
+  mode: ResyncMode;
+  resetReason: ResyncResetReason;
+  cursor: SyncCursor & {
+    requestedAfterId: number;
   };
 }
 
@@ -56,6 +81,10 @@ export interface ClientState {
   logOrder: LogOrder;
 }
 
+export function getEffectiveClientMaxRenderedLines(limit: number): number {
+  return Number.isInteger(limit) && limit > 0 ? Math.min(limit, CLIENT_MAX_RENDERED_LINES_CAP) : CLIENT_MAX_RENDERED_LINES_CAP;
+}
+
 export function createInitialState(): ClientState {
   return {
     lines: [],
@@ -71,7 +100,7 @@ export function createInitialState(): ClientState {
     },
     paused: false,
     autoScroll: true,
-    clientMaxRenderedLines: 1500,
+    clientMaxRenderedLines: getEffectiveClientMaxRenderedLines(CLIENT_MAX_RENDERED_LINES_CAP),
     theme: 'light',
     logOrder: 'newest-first'
   };
