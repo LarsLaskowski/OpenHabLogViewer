@@ -16,21 +16,21 @@ export function renderSourceStatuses(target: HTMLElement, statuses: SourceStatus
 
   for (const status of statuses) {
     const row = document.createElement('div');
-    row.className = `status-card state-${status.state}`;
+    row.className = `status-chip state-${status.state}`;
+    const statusLabel = formatSourceStatusLabel(status);
+    row.title = statusLabel;
+    row.setAttribute('aria-label', statusLabel);
 
-    const title = document.createElement('div');
-    title.className = 'status-card-title';
+    const indicator = document.createElement('span');
+    indicator.className = 'status-indicator';
+    indicator.textContent = SOURCE_STATE_SYMBOLS[status.state];
+    indicator.setAttribute('aria-hidden', 'true');
+
+    const title = document.createElement('span');
+    title.className = 'status-file-name';
     title.textContent = status.fileName;
 
-    const state = document.createElement('div');
-    state.className = 'status-card-state';
-    state.textContent = status.state;
-
-    const message = document.createElement('div');
-    message.className = 'status-card-message';
-    message.textContent = status.message;
-
-    row.append(title, state, message);
+    row.append(indicator, title);
     fragment.append(row);
   }
 
@@ -156,7 +156,7 @@ function formatLoggerLabel(logger: string | null): string {
 
   const normalizedLogger = logger.trim();
   const lastSegment = getLastSegment(normalizedLogger);
-  const mappedLabel = LOGGER_LABELS[lastSegment];
+  const mappedLabel = LOGGER_LABELS[normalizedLogger] ?? LOGGER_LABELS[lastSegment];
 
   if (mappedLabel) {
     return mappedLabel;
@@ -176,6 +176,15 @@ function formatLoggerLabel(logger: string | null): string {
   }
 
   return normalizedLogger;
+}
+
+function formatSourceStatusLabel(status: SourceStatus): string {
+  const stateLabel = SOURCE_STATE_LABELS[status.state];
+  if (!status.message || status.state === 'watching') {
+    return `${status.fileName}: ${stateLabel}`;
+  }
+
+  return `${status.fileName}: ${stateLabel} - ${status.message}`;
 }
 
 function extractScriptName(logger: string): string | null {
@@ -206,10 +215,29 @@ function looksLikeTypeName(value: string): boolean {
 }
 
 const LOGGER_LABELS: Record<string, string> = {
+  'ty.util.ssl.SslContextFactory.config': 'SSL-Config',
   ChannelTriggeredEvent: 'Channel triggered',
   InboxRemovedEvent: 'Inbox entry removed',
   ItemCommandEvent: 'Item command',
   ItemStateChangedEvent: 'Item state changed',
   ItemStatePredictedEvent: 'Item state predicted',
   ThingStatusInfoChangedEvent: 'Thing status changed'
+};
+
+const SOURCE_STATE_SYMBOLS: Record<SourceStatus['state'], string> = {
+  idle: '○',
+  watching: '●',
+  missing: '!',
+  'permission-denied': '!',
+  rotated: '↻',
+  error: '×'
+};
+
+const SOURCE_STATE_LABELS: Record<SourceStatus['state'], string> = {
+  idle: 'Waiting',
+  watching: 'Watching',
+  missing: 'Missing',
+  'permission-denied': 'Permission denied',
+  rotated: 'Rotated',
+  error: 'Error'
 };

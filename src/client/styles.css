@@ -85,15 +85,14 @@ body {
 
 .app-shell {
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   min-height: 100vh;
   gap: 0.5rem;
   padding: 0.5rem;
 }
 
 .topbar,
-.controls,
-.source-status-panel {
+.controls {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -118,6 +117,13 @@ body {
   min-width: 0;
 }
 
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
 .brand-image {
   width: auto;
   height: 2.25rem;
@@ -125,8 +131,7 @@ body {
   display: block;
 }
 
-.topbar h1,
-.source-status-panel h2 {
+.topbar h1 {
   margin: 0;
   line-height: 1.2;
 }
@@ -135,14 +140,23 @@ body {
   font-size: 1.25rem;
 }
 
-.source-status-panel h2 {
-  font-size: 1rem;
-}
-
 .subtitle {
   margin: 0.1rem 0 0;
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+.app-version {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.1;
 }
 
 .controls {
@@ -152,7 +166,7 @@ body {
   align-items: flex-end;
 }
 
-.controls.sticky-oldest-first {
+.controls.sticky-controls {
   position: sticky;
   top: 0.5rem;
   z-index: 10;
@@ -207,47 +221,65 @@ body {
   cursor: pointer;
 }
 
+.controls-status {
+  display: flex;
+  flex: 1 1 100%;
+  align-items: center;
+  min-width: 0;
+}
+
 .status-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-  gap: 0.5rem;
-  margin-top: 0.5rem;
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  min-width: 0;
 }
 
-.status-card {
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 999px;
   background: var(--surface-2);
-  padding: 0.5rem 0.6rem;
+  padding: 0.18rem 0.55rem;
+  font-size: 0.82rem;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
-.status-card-title {
+.status-file-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0.8rem;
+  font-size: 0.85rem;
   font-weight: 700;
-}
-
-.status-card-state {
-  margin-top: 0.2rem;
-  text-transform: uppercase;
-  font-size: 0.75rem;
-}
-
-.status-card-message {
-  margin-top: 0.2rem;
+  line-height: 1;
   color: var(--muted);
-  font-size: 0.8rem;
 }
 
-.state-watching .status-card-state {
+.state-idle .status-indicator {
+  color: var(--muted);
+}
+
+.state-watching .status-indicator {
   color: var(--ok);
 }
 
-.state-missing .status-card-state,
-.state-permission-denied .status-card-state,
-.state-error .status-card-state {
-  color: #f87171;
+.state-missing .status-indicator,
+.state-permission-denied .status-indicator,
+.state-error .status-indicator {
+  color: var(--badge-error-text);
 }
 
-.state-rotated .status-card-state {
+.state-rotated .status-indicator {
   color: var(--warn);
 }
 

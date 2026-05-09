@@ -90,7 +90,6 @@ async function bootstrap(): Promise<void> {
   applyStoredPreferences(loadStoredPreferences());
   syncDerivedLogFiltersWithState();
   applyTheme(state.theme);
-  applyLogOrderLayout(state.logOrder);
   syncControlsFromState();
   renderConnectionStatus(connectionStatusElement, state.connectionState);
   completePreferencesTiming({
@@ -178,7 +177,6 @@ function bindControls(): void {
 
   orderSelectElement.addEventListener('change', () => {
     state.logOrder = parseLogOrder(orderSelectElement.value);
-    applyLogOrderLayout(state.logOrder);
     markDerivedLogOrderDirty();
     schedulePreferencesPersist();
     performanceMonitor.recordEvent('render', 'log-order-change', {
@@ -586,10 +584,6 @@ function applyTheme(theme: Theme): void {
   document.documentElement.dataset.theme = theme;
   faviconElement.href = theme === 'dark' ? './assets/openHAB_darkBG_appicon.svg' : './assets/openHAB_appicon.svg';
   brandImageElement.src = theme === 'dark' ? './assets/openHAB_workswith_darkBG.svg' : './assets/openHAB_workswith.svg';
-}
-
-function applyLogOrderLayout(logOrder: LogOrder): void {
-  controlsElement.classList.toggle('sticky-oldest-first', logOrder === 'oldest-first');
 }
 
 function loadStoredLogOrder(): LogOrder {

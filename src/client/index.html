@@ -20,14 +20,17 @@
             height="48"
           />
           <div class="brand-copy">
-            <h1>OpenHab Log Viewer</h1>
+            <div class="title-row">
+              <h1>OpenHab Log Viewer</h1>
+              <span class="app-version">v__APP_VERSION__</span>
+            </div>
             <p class="subtitle">Live view for events.log and openhab.log</p>
           </div>
         </div>
         <div id="connection-status" class="connection-badge connection-connecting">Connecting</div>
       </header>
 
-      <section id="controls-panel" class="controls">
+      <section id="controls-panel" class="controls sticky-controls">
         <label>
           Source
           <select id="source-filter">
@@ -81,11 +84,10 @@
         </label>
 
         <button id="clear-button" type="button">Clear browser buffer</button>
-      </section>
 
-      <section class="source-status-panel">
-        <h2>Source status</h2>
-        <div id="source-status-list" class="status-list"></div>
+        <div class="controls-status" aria-label="Source status">
+          <div id="source-status-list" class="status-list"></div>
+        </div>
       </section>
 
       <main id="log-container" class="log-container" aria-live="polite"></main>

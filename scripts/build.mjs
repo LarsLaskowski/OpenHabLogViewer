@@ -1,5 +1,5 @@
 import { build } from 'esbuild';
-import { cp, mkdir, rm } from 'node:fs/promises';
+import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -8,6 +8,7 @@ const distDir = path.join(rootDir, 'dist');
 const clientDistDir = path.join(distDir, 'client');
 const serverDistDir = path.join(distDir, 'server');
 const clientAssetsDir = path.join(clientDistDir, 'assets');
+const packageJson = JSON.parse(await readFile(path.join(rootDir, 'package.json'), 'utf8'));
 
 await rm(distDir, { recursive: true, force: true });
 await mkdir(clientDistDir, { recursive: true });
@@ -36,7 +37,8 @@ await build({
   logLevel: 'info'
 });
 
-await cp(path.join(rootDir, 'src', 'client', 'index.html'), path.join(clientDistDir, 'index.html'));
+const clientIndexTemplate = await readFile(path.join(rootDir, 'src', 'client', 'index.html'), 'utf8');
+await writeFile(path.join(clientDistDir, 'index.html'), clientIndexTemplate.replaceAll('__APP_VERSION__', packageJson.version));
 await cp(path.join(rootDir, 'src', 'client', 'styles.css'), path.join(clientDistDir, 'styles.css'));
 await cp(path.join(rootDir, 'src', 'assets', 'openHAB_appicon.svg'), path.join(clientAssetsDir, 'openHAB_appicon.svg'));
 await cp(
