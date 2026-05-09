@@ -44,11 +44,35 @@ export interface SourceStatus {
   updatedAt: string;
 }
 
+export interface SyncCursor {
+  oldestAvailableId: number | null;
+  newestAvailableId: number | null;
+  lastIncludedId: number | null;
+  limit: number;
+  totalBufferedLines: number;
+  truncated: boolean;
+}
+
+export type ResyncMode = 'append' | 'reset';
+export type ResyncResetReason = 'cursor-not-available' | 'limit-exceeded' | null;
+
 export interface BootstrapResponse {
   lines: LogLine[];
   statuses: SourceStatus[];
   config: {
     clientMaxRenderedLines: number;
     initialLinesPerFile: number;
+    serverMaxSyncLines: number;
+  };
+  cursor: SyncCursor;
+}
+
+export interface ResyncResponse {
+  lines: LogLine[];
+  statuses: SourceStatus[];
+  mode: ResyncMode;
+  resetReason: ResyncResetReason;
+  cursor: SyncCursor & {
+    requestedAfterId: number;
   };
 }

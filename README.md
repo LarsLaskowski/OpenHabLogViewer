@@ -21,8 +21,8 @@ Live web UI for `events.log` and `openhab.log` built with Node.js, Express, and 
 | `EVENTS_LOG_PATH` | `/var/log/openhab/events.log` | Full path to `events.log` |
 | `OPENHAB_LOG_PATH` | `/var/log/openhab/openhab.log` | Full path to `openhab.log` |
 | `INITIAL_LINES_PER_FILE` | `500` | Number of latest lines per file included in bootstrap |
-| `MAX_BUFFERED_LINES` | `10000` | Maximum shared server-side ring buffer size |
-| `CLIENT_MAX_RENDERED_LINES` | `1500` | Maximum number of lines kept in the browser buffer |
+| `MAX_BUFFERED_LINES` | `2000` | Maximum shared server-side ring buffer size |
+| `CLIENT_MAX_RENDERED_LINES` | `500` | Maximum number of lines kept in the browser buffer |
 
 `EVENTS_LOG_PATH` and `OPENHAB_LOG_PATH` take precedence over `OPENHAB_LOG_DIR`.
 
@@ -48,6 +48,12 @@ npm run start
 ```
 
 The application is then available at `http://localhost:9001`.
+
+### Optional client performance instrumentation
+
+For development profiling, enable the browser-side instrumentation with `?perf=1` in the URL or by running `localStorage.setItem('openhab-log-viewer.perf', '1')` in the browser console and then reloading the page.
+
+When enabled, the client records recent bootstrap, filter, render, SSE, reconnect, and visibility-resume measurements in `window.__openhabPerf.snapshot()`. Bootstrap, reconnect, visibility, and slow filter/render/SSE timings are also written to the browser console. Disable it again with `localStorage.removeItem('openhab-log-viewer.perf')` or `?perf=0`.
 
 ## Usage
 
@@ -139,8 +145,8 @@ PORT=9001
 EVENTS_LOG_PATH=/var/log/openhab/events.log
 OPENHAB_LOG_PATH=/var/log/openhab/openhab.log
 INITIAL_LINES_PER_FILE=500
-MAX_BUFFERED_LINES=10000
-CLIENT_MAX_RENDERED_LINES=1500
+MAX_BUFFERED_LINES=2000
+CLIENT_MAX_RENDERED_LINES=500
 ```
 
 Important: the service user must have read access to `/var/log/openhab/events.log` and `/var/log/openhab/openhab.log`.
