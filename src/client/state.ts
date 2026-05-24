@@ -67,6 +67,7 @@ export interface FiltersState {
   source: 'all' | LogSource;
   level: 'all' | LogLevel;
   query: string;
+  hideSourceInMessage: boolean;
 }
 
 export interface ClientState {
@@ -96,7 +97,8 @@ export function createInitialState(): ClientState {
     filters: {
       source: 'all',
       level: 'all',
-      query: ''
+      query: '',
+      hideSourceInMessage: true
     },
     paused: false,
     autoScroll: true,

@@ -37,14 +37,14 @@ export function renderSourceStatuses(target: HTMLElement, statuses: SourceStatus
   target.append(fragment);
 }
 
-export function renderLogLines(target: HTMLElement, lines: LogLine[], autoScroll: boolean, logOrder: LogOrder): void {
+export function renderLogLines(target: HTMLElement, lines: LogLine[], autoScroll: boolean, logOrder: LogOrder, hideSourceInMessage?: boolean): void {
   const previousScrollTop = target.scrollTop;
   const previousScrollHeight = target.scrollHeight;
   target.textContent = '';
 
   const fragment = document.createDocumentFragment();
   for (const line of lines) {
-    fragment.append(createLogLineElement(line));
+    fragment.append(createLogLineElement(line, hideSourceInMessage));
   }
 
   target.append(fragment);
@@ -58,7 +58,7 @@ export function renderLogLines(target: HTMLElement, lines: LogLine[], autoScroll
   }
 }
 
-function createLogLineElement(line: LogLine): HTMLElement {
+function createLogLineElement(line: LogLine, hideSourceInMessage?: boolean): HTMLElement {
   const row = document.createElement('article');
   row.className = [
     'log-line',
@@ -73,7 +73,7 @@ function createLogLineElement(line: LogLine): HTMLElement {
       createPlaceholderCell('source-cell'),
       createPlaceholderCell('level-cell'),
       createPlaceholderCell('logger-cell'),
-      createMessageCell(line)
+      createMessageCell(line, hideSourceInMessage)
     );
   } else {
     const timestampLabel = line.timestamp ? formatTimestamp(line.timestamp) : '—';
@@ -86,7 +86,7 @@ function createLogLineElement(line: LogLine): HTMLElement {
       createBadgeCell('source-cell', line.fileName, `source-badge source-${line.source}`),
       createBadgeCell('level-cell', line.level ?? '—', `level-badge ${line.level ? `level-${line.level.toLowerCase()}` : 'level-none'}`),
       createCell('logger-cell', loggerLabel, loggerTooltip),
-      createMessageCell(line)
+      createMessageCell(line, hideSourceInMessage)
     );
   }
 
@@ -122,10 +122,14 @@ function createPlaceholderCell(className: string): HTMLElement {
   return element;
 }
 
-function createMessageCell(line: LogLine): HTMLElement {
+function createMessageCell(line: LogLine, hideSourceInMessage?: boolean): HTMLElement {
   const element = document.createElement('div');
   element.className = 'message-cell';
-  element.textContent = line.isTimestamped ? line.message : line.rawLine;
+  let message = line.isTimestamped ? line.message : line.rawLine;
+  if (hideSourceInMessage) {
+    message = stripSourceFromMessage(message);
+  }
+  element.textContent = message;
   return element;
 }
 
@@ -241,3 +245,7 @@ const SOURCE_STATE_LABELS: Record<SourceStatus['state'], string> = {
   rotated: 'Rotated',
   error: 'Error'
 };
+
+function stripSourceFromMessage(message: string): string {
+  return message.replace(/\s*\(source:\s*[^)]+\)\s*/g, ' ').trim();
+}

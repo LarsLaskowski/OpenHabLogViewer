@@ -43,6 +43,7 @@ const themeSelectElement = getRequiredInput<HTMLSelectElement>('theme-select');
 const orderSelectElement = getRequiredInput<HTMLSelectElement>('order-select');
 const autoScrollElement = getRequiredInput<HTMLInputElement>('auto-scroll');
 const pauseToggleElement = getRequiredInput<HTMLInputElement>('pause-toggle');
+const hideSourceToggleElement = getRequiredInput<HTMLInputElement>('hide-source-toggle');
 const clearButtonElement = getRequiredInput<HTMLButtonElement>('clear-button');
 const faviconElement = getRequiredLink('app-favicon');
 const brandImageElement = getRequiredImage('app-brand-image');
@@ -203,6 +204,15 @@ function bindControls(): void {
     if (!state.paused) {
       renderAllImmediate('pause-resume');
     }
+  });
+
+  hideSourceToggleElement.addEventListener('change', () => {
+    state.filters.hideSourceInMessage = hideSourceToggleElement.checked;
+    schedulePreferencesPersist();
+    performanceMonitor.recordEvent('filter', 'hide-source-toggle', {
+      hideSourceInMessage: state.filters.hideSourceInMessage
+    });
+    renderAllImmediate('hide-source-toggle');
   });
 
   clearButtonElement.addEventListener('click', () => {
@@ -435,6 +445,7 @@ function syncControlsFromState(): void {
   sourceFilterElement.value = state.filters.source;
   levelFilterElement.value = state.filters.level;
   textFilterElement.value = state.filters.query;
+  hideSourceToggleElement.checked = state.filters.hideSourceInMessage;
   themeSelectElement.value = state.theme;
   orderSelectElement.value = state.logOrder;
   autoScrollElement.checked = state.autoScroll;
@@ -554,7 +565,8 @@ function parseStoredFilters(value: unknown): FiltersState | undefined {
   return {
     source: parseSourceFilter(candidate.source),
     level: parseLevelFilter(candidate.level),
-    query: typeof candidate.query === 'string' ? candidate.query : ''
+    query: typeof candidate.query === 'string' ? candidate.query : '',
+    hideSourceInMessage: typeof candidate.hideSourceInMessage === 'boolean' ? candidate.hideSourceInMessage : true
   };
 }
 
@@ -607,7 +619,7 @@ function renderCurrentLogLines(renderReason: string): number {
     paused: state.paused,
     reason: renderReason
   });
-  renderLogLines(logContainerElement, displayLines, state.autoScroll, state.logOrder);
+  renderLogLines(logContainerElement, displayLines, state.autoScroll, state.logOrder, state.filters.hideSourceInMessage);
   completeRenderTiming({
     displayedLines: displayLines.length
   });
