@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'node:path';
+import rateLimit from 'express-rate-limit';
 import { loadConfig } from './config.js';
 import { LogBuffer } from './logBuffer.js';
 import { LogLineDraft, SourceStatus } from './types.js';
@@ -51,6 +52,16 @@ async function main(): Promise<void> {
 
   app.use('/api', createApiRouter({ config, buffer, sseHub, getStatuses: () => Array.from(sourceStatuses.values()) }));
   app.use(express.static(clientDistDir));
+
+  const htmlLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 100,
+    message: 'Too many requests, please try again later',
+    standardHeaders: true,
+    legacyHeaders: false
+  });
+
+  app.use(htmlLimiter);
   app.use((_request, response) => {
     response.sendFile(path.join(clientDistDir, 'index.html'));
   });
