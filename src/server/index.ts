@@ -48,6 +48,7 @@ async function main(): Promise<void> {
   }
 
   const app = express();
+  app.disable('x-powered-by');
   const clientDistDir = path.resolve(process.cwd(), 'dist', 'client');
 
   app.use('/api', createApiRouter({ config, buffer, sseHub, getStatuses: () => Array.from(sourceStatuses.values()) }));
