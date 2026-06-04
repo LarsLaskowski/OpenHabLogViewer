@@ -39,3 +39,6 @@ tmp/
 temp/
 .tmp/
 .cache/
+
+# Local Claude Code settings (machine-specific paths)
+.claude/settings.local.json
