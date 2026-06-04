@@ -54,8 +54,8 @@ let hiddenSinceMs: number | null = document.visibilityState === 'hidden' ? perfo
 let pendingVisibleRenderSinceMs: number | null = null;
 let pendingVisibleSseSinceMs: number | null = null;
 let pendingVisibleConnectionSinceMs: number | null = null;
-let searchInputDebounceHandle: number | null = null;
-let preferencesPersistDebounceHandle: number | null = null;
+let searchInputDebounceHandle: ReturnType<typeof globalThis.setTimeout> | null = null;
+let preferencesPersistDebounceHandle: ReturnType<typeof globalThis.setTimeout> | null = null;
 const pendingLiveRender: PendingLiveRenderState = {
   frameId: null,
   logLines: false,
@@ -454,10 +454,10 @@ function syncControlsFromState(): void {
 
 function scheduleSearchInputRender(): void {
   if (searchInputDebounceHandle !== null) {
-    window.clearTimeout(searchInputDebounceHandle);
+    globalThis.clearTimeout(searchInputDebounceHandle);
   }
 
-  searchInputDebounceHandle = window.setTimeout(() => {
+  searchInputDebounceHandle = globalThis.setTimeout(() => {
     searchInputDebounceHandle = null;
     const filterKeyChanged = syncDerivedLogFiltersWithState();
     performanceMonitor.recordEvent('filter', 'text-change', {
@@ -476,16 +476,16 @@ function cancelPendingSearchInputRender(): void {
     return;
   }
 
-  window.clearTimeout(searchInputDebounceHandle);
+  globalThis.clearTimeout(searchInputDebounceHandle);
   searchInputDebounceHandle = null;
 }
 
 function schedulePreferencesPersist(): void {
   if (preferencesPersistDebounceHandle !== null) {
-    window.clearTimeout(preferencesPersistDebounceHandle);
+    globalThis.clearTimeout(preferencesPersistDebounceHandle);
   }
 
-  preferencesPersistDebounceHandle = window.setTimeout(() => {
+  preferencesPersistDebounceHandle = globalThis.setTimeout(() => {
     preferencesPersistDebounceHandle = null;
     persistPreferencesNow();
   }, UI_PREFERENCES_PERSIST_DEBOUNCE_MS);
@@ -510,7 +510,7 @@ function flushPendingPreferencePersistence(): void {
     return;
   }
 
-  window.clearTimeout(preferencesPersistDebounceHandle);
+  globalThis.clearTimeout(preferencesPersistDebounceHandle);
   preferencesPersistDebounceHandle = null;
   persistPreferencesNow();
 }
@@ -790,7 +790,7 @@ function scheduleLiveRender(update: { logLines?: number; sourceStatuses?: number
     return;
   }
 
-  pendingLiveRender.frameId = window.requestAnimationFrame(() => {
+  pendingLiveRender.frameId = globalThis.requestAnimationFrame(() => {
     pendingLiveRender.frameId = null;
     flushScheduledLiveRender();
   });
@@ -826,7 +826,7 @@ function flushScheduledLiveRender(): void {
 
 function cancelScheduledLiveRender(): void {
   if (pendingLiveRender.frameId !== null) {
-    window.cancelAnimationFrame(pendingLiveRender.frameId);
+    globalThis.cancelAnimationFrame(pendingLiveRender.frameId);
     pendingLiveRender.frameId = null;
   }
 
@@ -1301,7 +1301,7 @@ interface StoredUiPreferences {
 }
 
 interface PendingLiveRenderState {
-  frameId: number | null;
+  frameId: ReturnType<typeof globalThis.requestAnimationFrame> | null;
   logLines: boolean;
   logLineCount: number;
   sourceStatuses: boolean;
