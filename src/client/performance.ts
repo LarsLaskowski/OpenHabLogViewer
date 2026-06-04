@@ -33,12 +33,10 @@ export interface ClientPerformanceMonitor {
 }
 
 declare global {
-  interface Window {
-    __openhabPerf?: {
-      clear: () => void;
-      snapshot: () => ClientPerformanceSnapshot;
-    };
-  }
+  var __openhabPerf: {
+    clear: () => void;
+    snapshot: () => ClientPerformanceSnapshot;
+  } | undefined;
 }
 
 interface SummaryAccumulator {
@@ -136,13 +134,13 @@ export function createClientPerformanceMonitor(): ClientPerformanceMonitor {
     }
   };
 
-  window.__openhabPerf = {
+  globalThis.__openhabPerf = {
     clear: monitor.clear,
     snapshot: monitor.snapshot
   };
 
   console.info(
-    '[perf] Client performance instrumentation enabled. Use window.__openhabPerf.snapshot() and window.__openhabPerf.clear().'
+    '[perf] Client performance instrumentation enabled. Use globalThis.__openhabPerf.snapshot() and globalThis.__openhabPerf.clear().'
   );
 
   return monitor;
@@ -185,13 +183,13 @@ export function createClientPerformanceMonitor(): ClientPerformanceMonitor {
 }
 
 function isPerformanceMonitoringEnabled(): boolean {
-  const searchValue = new URLSearchParams(window.location.search).get('perf');
+  const searchValue = new URLSearchParams(globalThis.location.search).get('perf');
   if (searchValue !== null) {
     return parseBooleanFlag(searchValue);
   }
 
   try {
-    return parseBooleanFlag(window.localStorage.getItem(ENABLE_STORAGE_KEY));
+    return parseBooleanFlag(globalThis.localStorage.getItem(ENABLE_STORAGE_KEY));
   } catch {
     return false;
   }
