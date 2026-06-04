@@ -251,7 +251,7 @@ function connectStream(): void {
       reconnectTiming = null;
     }
 
-    performanceMonitor.recordEvent(wasReconnecting ? 'connection' : 'connection', wasReconnecting ? 'open-after-reconnect' : 'open', {
+    performanceMonitor.recordEvent('connection', wasReconnecting ? 'open-after-reconnect' : 'open', {
       readyState: stream.readyState,
       visibilityState: document.visibilityState
     });
