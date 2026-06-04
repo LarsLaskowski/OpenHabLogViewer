@@ -276,8 +276,6 @@ async function readLastLines(filePath: string, maxLines: number): Promise<string
     const parts = normalizedText.split('\n');
     if (normalizedText.endsWith('\n')) {
       parts.pop();
-    } else {
-      parts.pop();
     }
 
     return parts.slice(-maxLines);
