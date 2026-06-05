@@ -210,7 +210,7 @@ function getLastSegment(value: string): string {
 function humanizePascalCase(value: string): string {
   return value
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .replace(/([A-Z])([A-Z][a-z])/g, '$1 $2')
     .trim();
 }
 
@@ -247,5 +247,5 @@ const SOURCE_STATE_LABELS: Record<SourceStatus['state'], string> = {
 };
 
 function stripSourceFromMessage(message: string): string {
-  return message.replace(/\s*\(source:\s*[^)]+\)\s*/g, ' ').trim();
+  return message.replace(/\s*\(source:[^)]+\)\s*/g, ' ').trim();
 }
