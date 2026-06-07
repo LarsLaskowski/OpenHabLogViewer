@@ -90,6 +90,28 @@ export class LogTailer {
     }
   }
 
+  private async handleInitialLoad(fileStats: Stats, nextFileKey: string): Promise<void> {
+    const initialLines = await readLastLines(this.sourceConfig.filePath, this.initialLinesPerFile);
+    this.offset = fileStats.size;
+    this.currentFileKey = nextFileKey;
+    this.hasLoadedInitialLines = true;
+    this.emitStatus('watching', `Watching ${this.sourceConfig.fileName}`);
+    if (initialLines.length > 0) {
+      this.onLines(initialLines.map((line) => this.parser.parse(this.sourceConfig, line)));
+    }
+  }
+
+  private async handleReattach(fileStats: Stats, nextFileKey: string): Promise<void> {
+    const reattachedLines = await readLastLines(this.sourceConfig.filePath, this.initialLinesPerFile);
+    this.offset = fileStats.size;
+    this.currentFileKey = nextFileKey;
+    this.pendingChunk = '';
+    this.emitStatus('watching', `Reattached to ${this.sourceConfig.fileName}`);
+    if (reattachedLines.length > 0) {
+      this.onLines(reattachedLines.map((line) => this.parser.parse(this.sourceConfig, line)));
+    }
+  }
+
   private async sync(): Promise<void> {
     if (this.syncInFlight) {
       this.syncQueued = true;
@@ -106,30 +128,16 @@ export class LogTailer {
       const nextFileKey = toFileKey(fileStats);
 
       if (!this.hasLoadedInitialLines) {
-        const initialLines = await readLastLines(this.sourceConfig.filePath, this.initialLinesPerFile);
-        this.offset = fileStats.size;
-        this.currentFileKey = nextFileKey;
-        this.hasLoadedInitialLines = true;
-        this.emitStatus('watching', `Watching ${this.sourceConfig.fileName}`);
-        if (initialLines.length > 0) {
-          this.onLines(initialLines.map((line) => this.parser.parse(this.sourceConfig, line)));
-        }
+        await this.handleInitialLoad(fileStats, nextFileKey);
         return;
       }
 
       if (!this.currentFileKey) {
-        const reattachedLines = await readLastLines(this.sourceConfig.filePath, this.initialLinesPerFile);
-        this.offset = fileStats.size;
-        this.currentFileKey = nextFileKey;
-        this.pendingChunk = '';
-        this.emitStatus('watching', `Reattached to ${this.sourceConfig.fileName}`);
-        if (reattachedLines.length > 0) {
-          this.onLines(reattachedLines.map((line) => this.parser.parse(this.sourceConfig, line)));
-        }
+        await this.handleReattach(fileStats, nextFileKey);
         return;
       }
 
-      if (this.currentFileKey && this.currentFileKey !== nextFileKey) {
+      if (this.currentFileKey !== nextFileKey) {
         this.currentFileKey = nextFileKey;
         this.offset = 0;
         this.pendingChunk = '';

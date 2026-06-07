@@ -957,58 +957,93 @@ function resetHiddenTabState(): void {
 
 async function resumeAfterVisibilityRestore(hiddenDurationMs: number | null): Promise<void> {
   if (hiddenTabState.pendingResync || syncState.pendingResyncAfterOpen) {
-    hiddenTabState.queuedLiveLines = [];
-    hiddenTabState.pendingResync = false;
-    const hadConnectionUpdate = hiddenTabState.connectionDirty;
-    const hadStatusUpdate = hiddenTabState.sourceStatusesDirty;
-    hiddenTabState.connectionDirty = false;
-    hiddenTabState.sourceStatusesDirty = false;
-    hiddenTabState.logLinesDirty = false;
+    await resumeWithResync(hiddenDurationMs);
+    return;
+  }
+  resumeFromNormalHide(hiddenDurationMs);
+}
 
-    if (hadConnectionUpdate) {
-      renderConnectionStatus(connectionStatusElement, state.connectionState);
-      consumeVisibleResumeConnection({
-        connectionState: state.connectionState,
-        hiddenDurationMs,
-        resyncPending: true
-      });
-    }
+async function resumeWithResync(hiddenDurationMs: number | null): Promise<void> {
+  hiddenTabState.queuedLiveLines = [];
+  hiddenTabState.pendingResync = false;
+  const hadConnectionUpdate = hiddenTabState.connectionDirty;
+  const hadStatusUpdate = hiddenTabState.sourceStatusesDirty;
+  hiddenTabState.connectionDirty = false;
+  hiddenTabState.sourceStatusesDirty = false;
+  hiddenTabState.logLinesDirty = false;
 
-    if (hadStatusUpdate) {
-      renderSourceStatuses(sourceStatusListElement, Object.values(state.statuses));
-      consumeVisibleResumeSse({
-        event: 'source-status',
-        hiddenDurationMs,
-        resyncPending: true
-      });
-    }
-
-    if (state.connectionState === 'connected') {
-      await resyncFromServer('visibility-resume');
-      return;
-    }
-
-    consumeVisibleResumeRender({
+  if (hadConnectionUpdate) {
+    renderConnectionStatus(connectionStatusElement, state.connectionState);
+    consumeVisibleResumeConnection({
+      connectionState: state.connectionState,
       hiddenDurationMs,
-      paused: state.paused,
-      reason: 'visibility-resync-deferred',
-      skipped: true
+      resyncPending: true
     });
+  }
+
+  if (hadStatusUpdate) {
+    renderSourceStatuses(sourceStatusListElement, Object.values(state.statuses));
+    consumeVisibleResumeSse({
+      event: 'source-status',
+      hiddenDurationMs,
+      resyncPending: true
+    });
+  }
+
+  if (state.connectionState === 'connected') {
+    await resyncFromServer('visibility-resume');
     return;
   }
 
+  consumeVisibleResumeRender({
+    hiddenDurationMs,
+    paused: state.paused,
+    reason: 'visibility-resync-deferred',
+    skipped: true
+  });
+}
+
+function resolveHiddenRenderReason(flushedHiddenLineCount: number): string {
+  if (flushedHiddenLineCount > 1) {
+    return 'visibility-hidden-batch';
+  }
+  if (flushedHiddenLineCount === 1) {
+    return 'visibility-hidden-line';
+  }
+  return 'visibility-resume';
+}
+
+function renderPausedVisibilityUpdates(
+  hadConnectionUpdate: boolean,
+  hadStatusUpdate: boolean,
+  shouldRenderLogLines: boolean,
+  flushedHiddenLineCount: number,
+  hiddenDurationMs: number | null,
+  renderReason: string
+): void {
+  if (hadConnectionUpdate) {
+    renderConnectionStatus(connectionStatusElement, state.connectionState);
+  }
+  if (hadStatusUpdate) {
+    renderSourceStatuses(sourceStatusListElement, Object.values(state.statuses));
+  }
+  if (shouldRenderLogLines) {
+    consumeVisibleResumeRender({
+      flushedHiddenLineCount,
+      hiddenDurationMs,
+      paused: state.paused,
+      reason: state.paused ? 'visibility-hidden-paused' : renderReason,
+      skipped: state.paused
+    });
+  }
+}
+
+function resumeFromNormalHide(hiddenDurationMs: number | null): void {
   const hadConnectionUpdate = hiddenTabState.connectionDirty;
   const hadStatusUpdate = hiddenTabState.sourceStatusesDirty;
   const shouldRenderLogLines = hiddenTabState.logLinesDirty;
   const flushedHiddenLineCount = flushHiddenQueuedLiveLines();
-  let renderReason: string;
-  if (flushedHiddenLineCount > 1) {
-    renderReason = 'visibility-hidden-batch';
-  } else if (flushedHiddenLineCount === 1) {
-    renderReason = 'visibility-hidden-line';
-  } else {
-    renderReason = 'visibility-resume';
-  }
+  const renderReason = resolveHiddenRenderReason(flushedHiddenLineCount);
 
   hiddenTabState.connectionDirty = false;
   hiddenTabState.sourceStatusesDirty = false;
@@ -1017,23 +1052,7 @@ async function resumeAfterVisibilityRestore(hiddenDurationMs: number | null): Pr
   if (!state.paused && shouldRenderLogLines) {
     renderAllImmediate(renderReason);
   } else {
-    if (hadConnectionUpdate) {
-      renderConnectionStatus(connectionStatusElement, state.connectionState);
-    }
-
-    if (hadStatusUpdate) {
-      renderSourceStatuses(sourceStatusListElement, Object.values(state.statuses));
-    }
-
-    if (shouldRenderLogLines) {
-      consumeVisibleResumeRender({
-        flushedHiddenLineCount,
-        hiddenDurationMs,
-        paused: state.paused,
-        reason: state.paused ? 'visibility-hidden-paused' : renderReason,
-        skipped: state.paused
-      });
-    }
+    renderPausedVisibilityUpdates(hadConnectionUpdate, hadStatusUpdate, shouldRenderLogLines, flushedHiddenLineCount, hiddenDurationMs, renderReason);
   }
 
   if (hadConnectionUpdate) {
