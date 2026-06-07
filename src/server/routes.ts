@@ -23,7 +23,11 @@ export function createApiRouter(dependencies: RouteDependencies): Router {
       pid: process.pid,
       uptimeSeconds: Math.round(process.uptime()),
       now: new Date().toISOString(),
-      sources: dependencies.getStatuses()
+      sources: dependencies.getStatuses(),
+      sseClients: {
+        current: dependencies.sseHub.clientCount,
+        max: dependencies.config.maxSseClients
+      }
     });
   });
 
@@ -110,6 +114,11 @@ export function createApiRouter(dependencies: RouteDependencies): Router {
   });
 
   router.get('/stream', (_request: Request, response: Response) => {
+    if (dependencies.sseHub.isFull()) {
+      response.status(503).json({ error: 'SSE connection limit reached. Try again later.' });
+      return;
+    }
+
     response.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     response.setHeader('Cache-Control', 'no-cache, no-transform');
     response.setHeader('Connection', 'keep-alive');
