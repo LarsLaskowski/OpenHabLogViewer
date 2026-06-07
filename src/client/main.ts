@@ -631,7 +631,14 @@ function renderCurrentLogLines(renderReason: string): number {
 }
 
 function getDisplayLines(reason: string): LogLine[] {
-  const filterCacheState = derivedLogView.filteredDirty ? 'recompute-filters' : derivedLogView.displayDirty ? 'recompute-order' : 'hit';
+  let filterCacheState: string;
+  if (derivedLogView.filteredDirty) {
+    filterCacheState = 'recompute-filters';
+  } else if (derivedLogView.displayDirty) {
+    filterCacheState = 'recompute-order';
+  } else {
+    filterCacheState = 'hit';
+  }
   const completeFilterTiming = performanceMonitor.startTiming('filter', 'get-display-lines', {
     filterCacheState,
     levelFilter: state.filters.level,
@@ -994,12 +1001,14 @@ async function resumeAfterVisibilityRestore(hiddenDurationMs: number | null): Pr
   const hadStatusUpdate = hiddenTabState.sourceStatusesDirty;
   const shouldRenderLogLines = hiddenTabState.logLinesDirty;
   const flushedHiddenLineCount = flushHiddenQueuedLiveLines();
-  const renderReason =
-    flushedHiddenLineCount > 1
-      ? 'visibility-hidden-batch'
-      : flushedHiddenLineCount === 1
-        ? 'visibility-hidden-line'
-        : 'visibility-resume';
+  let renderReason: string;
+  if (flushedHiddenLineCount > 1) {
+    renderReason = 'visibility-hidden-batch';
+  } else if (flushedHiddenLineCount === 1) {
+    renderReason = 'visibility-hidden-line';
+  } else {
+    renderReason = 'visibility-resume';
+  }
 
   hiddenTabState.connectionDirty = false;
   hiddenTabState.sourceStatusesDirty = false;
