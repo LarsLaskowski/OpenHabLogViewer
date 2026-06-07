@@ -2,12 +2,13 @@ import { ConnectionState, LogLine, LogOrder, SourceStatus } from './state.js';
 
 export function renderConnectionStatus(target: HTMLElement, connectionState: ConnectionState): void {
   target.className = `connection-badge connection-${connectionState}`;
-  target.textContent =
-    connectionState === 'connected'
-      ? 'Connected'
-      : connectionState === 'reconnecting'
-        ? 'Reconnecting'
-        : 'Connecting';
+  if (connectionState === 'connected') {
+    target.textContent = 'Connected';
+  } else if (connectionState === 'reconnecting') {
+    target.textContent = 'Reconnecting';
+  } else {
+    target.textContent = 'Connecting';
+  }
 }
 
 export function renderSourceStatuses(target: HTMLElement, statuses: SourceStatus[]): void {
