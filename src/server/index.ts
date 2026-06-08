@@ -51,8 +51,14 @@ async function main(): Promise<void> {
   app.disable('x-powered-by');
   const clientDistDir = path.resolve(process.cwd(), 'dist', 'client');
 
-  app.use('/api', createApiRouter({ config, buffer, sseHub, getStatuses: () => Array.from(sourceStatuses.values()) }));
-  app.use(express.static(clientDistDir));
+  const apiLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 200,
+    skip: (request) => request.path === '/stream',
+    message: 'Too many requests, please try again later',
+    standardHeaders: true,
+    legacyHeaders: false
+  });
 
   const htmlLimiter = rateLimit({
     windowMs: 60 * 1000,
@@ -61,6 +67,9 @@ async function main(): Promise<void> {
     standardHeaders: true,
     legacyHeaders: false
   });
+
+  app.use('/api', apiLimiter, createApiRouter({ config, buffer, sseHub, getStatuses: () => Array.from(sourceStatuses.values()) }));
+  app.use(express.static(clientDistDir));
 
   app.use(htmlLimiter);
   app.use((_request, response) => {
