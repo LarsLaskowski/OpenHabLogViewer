@@ -1,14 +1,23 @@
 import path from 'node:path';
+import fs from 'node:fs';
 import { AppConfig, LogSource, SourceConfig } from './types.js';
 
-function parsePositiveInteger(name: string, fallback: number): number {
+function clampInteger(name: string, fallback: number, min: number, max: number): number {
   const rawValue = process.env[name];
   if (!rawValue) {
     return fallback;
   }
 
   const parsedValue = Number.parseInt(rawValue, 10);
-  return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : fallback;
+  if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+    return fallback;
+  }
+
+  const clamped = Math.min(Math.max(parsedValue, min), max);
+  if (clamped !== parsedValue) {
+    console.warn(`[config] ${name}=${parsedValue} is outside [${min}, ${max}]; using ${clamped}`);
+  }
+  return clamped;
 }
 
 function resolveSourceConfig(
@@ -17,7 +26,20 @@ function resolveSourceConfig(
   logDir: string,
   fallbackFileName: string
 ): SourceConfig {
-  const filePath = explicitPath?.trim() || path.join(logDir, fallbackFileName);
+  const rawPath = explicitPath?.trim() || path.join(logDir, fallbackFileName);
+  const filePath = path.resolve(rawPath);
+
+  try {
+    const canonicalPath = fs.realpathSync(filePath);
+    if (!fs.statSync(canonicalPath).isFile()) {
+      throw new Error(`[config] ${source} path is not a regular file: ${rawPath}`);
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('[config]')) {
+      throw error;
+    }
+    // File does not exist yet — logTailer handles missing files gracefully
+  }
 
   return {
     source,
@@ -30,11 +52,11 @@ export function loadConfig(): AppConfig {
   const logDir = process.env.OPENHAB_LOG_DIR?.trim() || '/var/log/openhab';
 
   return {
-    port: parsePositiveInteger('PORT', 9001),
-    initialLinesPerFile: parsePositiveInteger('INITIAL_LINES_PER_FILE', 500),
-    maxBufferedLines: parsePositiveInteger('MAX_BUFFERED_LINES', 2_000),
-    clientMaxRenderedLines: parsePositiveInteger('CLIENT_MAX_RENDERED_LINES', 500),
-    maxSseClients: parsePositiveInteger('MAX_SSE_CLIENTS', 10),
+    port: clampInteger('PORT', 9001, 1, 65_535),
+    initialLinesPerFile: clampInteger('INITIAL_LINES_PER_FILE', 500, 1, 100_000),
+    maxBufferedLines: clampInteger('MAX_BUFFERED_LINES', 2_000, 100, 1_000_000),
+    clientMaxRenderedLines: clampInteger('CLIENT_MAX_RENDERED_LINES', 500, 100, 100_000),
+    maxSseClients: clampInteger('MAX_SSE_CLIENTS', 10, 1, 1_000),
     sources: [
       resolveSourceConfig('events', process.env.EVENTS_LOG_PATH, logDir, 'events.log'),
       resolveSourceConfig('openhab', process.env.OPENHAB_LOG_PATH, logDir, 'openhab.log')
