@@ -23,6 +23,7 @@ Live web UI for `events.log` and `openhab.log` built with Node.js, Express, and 
 | `INITIAL_LINES_PER_FILE` | `500` | Number of latest lines per file included in bootstrap |
 | `MAX_BUFFERED_LINES` | `2000` | Maximum shared server-side ring buffer size |
 | `CLIENT_MAX_RENDERED_LINES` | `500` | Maximum number of lines kept in the browser buffer |
+| `MAX_SSE_CLIENTS` | `10` | Maximum number of concurrent SSE stream connections; excess requests receive HTTP 503 |
 
 `EVENTS_LOG_PATH` and `OPENHAB_LOG_PATH` take precedence over `OPENHAB_LOG_DIR`.
 
@@ -147,6 +148,7 @@ OPENHAB_LOG_PATH=/var/log/openhab/openhab.log
 INITIAL_LINES_PER_FILE=500
 MAX_BUFFERED_LINES=2000
 CLIENT_MAX_RENDERED_LINES=500
+MAX_SSE_CLIENTS=10
 ```
 
 Important: the service user must have read access to `/var/log/openhab/events.log` and `/var/log/openhab/openhab.log`.

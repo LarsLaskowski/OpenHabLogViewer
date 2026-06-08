@@ -34,6 +34,7 @@ export function loadConfig(): AppConfig {
     initialLinesPerFile: parsePositiveInteger('INITIAL_LINES_PER_FILE', 500),
     maxBufferedLines: parsePositiveInteger('MAX_BUFFERED_LINES', 2_000),
     clientMaxRenderedLines: parsePositiveInteger('CLIENT_MAX_RENDERED_LINES', 500),
+    maxSseClients: parsePositiveInteger('MAX_SSE_CLIENTS', 10),
     sources: [
       resolveSourceConfig('events', process.env.EVENTS_LOG_PATH, logDir, 'events.log'),
       resolveSourceConfig('openhab', process.env.OPENHAB_LOG_PATH, logDir, 'openhab.log')

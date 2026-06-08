@@ -9,11 +9,21 @@ export class SseHub {
   private readonly clients = new Map<number, SseClient>();
   private nextClientId = 1;
   private readonly heartbeatTimer: NodeJS.Timeout;
+  private readonly maxClients: number;
 
-  constructor(heartbeatMs = 15_000) {
+  constructor(heartbeatMs = 15_000, maxClients = 10) {
+    this.maxClients = maxClients;
     this.heartbeatTimer = setInterval(() => {
       this.broadcast('heartbeat', { ts: new Date().toISOString() });
     }, heartbeatMs);
+  }
+
+  get clientCount(): number {
+    return this.clients.size;
+  }
+
+  isFull(): boolean {
+    return this.clients.size >= this.maxClients;
   }
 
   addClient(response: Response): () => void {

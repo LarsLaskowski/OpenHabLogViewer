@@ -15,6 +15,7 @@ export interface AppConfig {
   initialLinesPerFile: number;
   maxBufferedLines: number;
   clientMaxRenderedLines: number;
+  maxSseClients: number;
   sources: SourceConfig[];
 }
 
