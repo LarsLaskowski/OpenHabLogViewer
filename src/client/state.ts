@@ -24,7 +24,6 @@ export interface LogLine {
 export interface SourceStatus {
   source: LogSource;
   fileName: string;
-  filePath: string;
   state: SourceState;
   message: string;
   updatedAt: string;
@@ -112,7 +111,6 @@ function createPlaceholderStatus(source: LogSource, fileName: string): SourceSta
   return {
     source,
     fileName,
-    filePath: '',
     state: 'idle',
     message: `Waiting for ${fileName}`,
     updatedAt: new Date().toISOString()

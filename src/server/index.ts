@@ -102,11 +102,10 @@ function compareInitialLines(left: LogLineDraft, right: LogLineDraft): number {
   return 0;
 }
 
-function createIdleStatus(source: { source: SourceStatus['source']; fileName: string; filePath: string }): SourceStatus {
+function createIdleStatus(source: { source: SourceStatus['source']; fileName: string }): SourceStatus {
   return {
     source: source.source,
     fileName: source.fileName,
-    filePath: source.filePath,
     state: 'idle',
     message: `Waiting for ${source.fileName}`,
     updatedAt: new Date().toISOString()
