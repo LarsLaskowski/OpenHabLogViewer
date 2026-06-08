@@ -39,7 +39,6 @@ export type LogLineDraft = Omit<LogLine, 'id'>;
 export interface SourceStatus {
   source: LogSource;
   fileName: string;
-  filePath: string;
   state: SourceState;
   message: string;
   updatedAt: string;

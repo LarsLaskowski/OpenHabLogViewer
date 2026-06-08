@@ -86,7 +86,8 @@ export class LogTailer {
         }
       });
     } catch {
-      this.emitStatus('error', `Unable to watch directory ${directory}`);
+      console.error(`[tailer] Unable to watch directory: ${directory}`);
+      this.emitStatus('error', `Cannot watch log directory for ${this.sourceConfig.fileName}`);
     }
   }
 
@@ -199,12 +200,14 @@ export class LogTailer {
         this.offset = 0;
         this.currentFileKey = null;
         this.pendingChunk = '';
-        this.emitStatus('missing', `File not found: ${this.sourceConfig.filePath}`);
+        console.log(`[tailer] ${this.sourceConfig.filePath}: ENOENT`);
+        this.emitStatus('missing', `File not found: ${this.sourceConfig.fileName}`);
         return null;
       }
 
       if (code === 'EACCES' || code === 'EPERM') {
-        this.emitStatus('permission-denied', `Permission denied: ${this.sourceConfig.filePath}`);
+        console.log(`[tailer] ${this.sourceConfig.filePath}: ${code}`);
+        this.emitStatus('permission-denied', `Permission denied: ${this.sourceConfig.fileName}`);
         return null;
       }
 
@@ -223,7 +226,6 @@ export class LogTailer {
     this.onStatus({
       source: this.sourceConfig.source,
       fileName: this.sourceConfig.fileName,
-      filePath: this.sourceConfig.filePath,
       state,
       message,
       updatedAt: new Date().toISOString()
