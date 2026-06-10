@@ -50,6 +50,10 @@ async function main(): Promise<void> {
   const app = express();
   app.disable('x-powered-by');
   app.use(securityHeaders);
+  // Off by default so direct deployments do not trust spoofable X-Forwarded-For
+  // headers. Set TRUST_PROXY (e.g. 1 for a single proxy hop) when running behind
+  // a reverse proxy so rate limiting keys on the real client IP.
+  app.set('trust proxy', config.trustProxy);
   const clientDistDir = path.resolve(process.cwd(), 'dist', 'client');
 
   const apiLimiter = rateLimit({

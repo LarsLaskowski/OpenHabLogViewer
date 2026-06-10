@@ -24,8 +24,11 @@ Live web UI for `events.log` and `openhab.log` built with Node.js, Express, and 
 | `MAX_BUFFERED_LINES` | `2000` | Maximum shared server-side ring buffer size |
 | `CLIENT_MAX_RENDERED_LINES` | `500` | Maximum number of lines kept in the browser buffer |
 | `MAX_SSE_CLIENTS` | `10` | Maximum number of concurrent SSE stream connections; excess requests receive HTTP 503 |
+| `TRUST_PROXY` | `false` | Express `trust proxy` setting. Leave off for direct deployments. Set to the number of proxy hops (e.g. `1`) when running behind a reverse proxy so rate limiting keys on the real client IP. Also accepts `true`, a preset (`loopback`), or a comma-separated list of IPs/subnets. |
 
 `EVENTS_LOG_PATH` and `OPENHAB_LOG_PATH` take precedence over `OPENHAB_LOG_DIR`.
+
+When the app runs behind a reverse proxy (Nginx, Caddy, Traefik), set `TRUST_PROXY` so the proxy's `X-Forwarded-For` header is honored. Without it, rate limiting keys every request on the proxy's IP, letting clients exhaust each other's request budget. Keep it **off** for direct deployments, otherwise clients can spoof their IP via `X-Forwarded-For`.
 
 ## Development and build
 
@@ -149,6 +152,8 @@ INITIAL_LINES_PER_FILE=500
 MAX_BUFFERED_LINES=2000
 CLIENT_MAX_RENDERED_LINES=500
 MAX_SSE_CLIENTS=10
+# Set to the number of proxy hops when running behind a reverse proxy:
+# TRUST_PROXY=1
 ```
 
 Important: the service user must have read access to `/var/log/openhab/events.log` and `/var/log/openhab/openhab.log`.
