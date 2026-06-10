@@ -113,9 +113,18 @@ export function createApiRouter(dependencies: RouteDependencies): Router {
     });
   });
 
-  router.get('/stream', (_request: Request, response: Response) => {
+  router.get('/stream', (request: Request, response: Response) => {
     if (dependencies.sseHub.isFull()) {
       response.status(503).json({ error: 'SSE connection limit reached. Try again later.' });
+      return;
+    }
+
+    // Keyed on request.ip, which honors X-Forwarded-For only when `trust proxy` is
+    // configured; otherwise it is the socket address. Falls back to the raw socket
+    // address if request.ip is unavailable.
+    const clientIp = request.ip ?? request.socket.remoteAddress ?? 'unknown';
+    if (dependencies.sseHub.isFullForIp(clientIp)) {
+      response.status(503).json({ error: 'Too many SSE connections from your address. Try again later.' });
       return;
     }
 
@@ -125,7 +134,7 @@ export function createApiRouter(dependencies: RouteDependencies): Router {
     response.setHeader('X-Accel-Buffering', 'no');
     response.flushHeaders();
 
-    const removeClient = dependencies.sseHub.addClient(response);
+    const removeClient = dependencies.sseHub.addClient(response, clientIp);
     response.on('close', removeClient);
   });
 
