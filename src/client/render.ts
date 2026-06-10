@@ -50,49 +50,39 @@ interface RenderedView {
 
 const renderedViews = new WeakMap<HTMLElement, RenderedView>();
 
-export function renderLogLines(target: HTMLElement, lines: LogLine[], autoScroll: boolean, logOrder: LogOrder, hideSourceInMessage?: boolean): void {
+export function renderLogLines(target: HTMLElement, lines: LogLine[], autoScroll: boolean, logOrder: LogOrder, hideSourceInMessage = false): void {
   const previousScrollTop = target.scrollTop;
   const previousScrollHeight = target.scrollHeight;
 
-  const hideSource = hideSourceInMessage ?? false;
   let view = renderedViews.get(target);
 
   // Row content depends on `hideSourceInMessage`; if it changed, the cached
   // nodes no longer match, so discard them and rebuild from scratch.
-  if (view && view.hideSourceInMessage !== hideSource) {
+  if (view && view.hideSourceInMessage !== hideSourceInMessage) {
     view = undefined;
   }
 
   const desiredIds = lines.map((line) => line.id);
 
-  // Fast path: the displayed ids are unchanged and still match what is actually
-  // in the DOM. Nothing to mutate beyond re-applying the scroll position.
-  if (view && target.childElementCount === view.ids.length && idsEqual(view.ids, desiredIds)) {
-    applyScrollPosition(target, autoScroll, logOrder, previousScrollTop, previousScrollHeight);
-    return;
+  // Reuse the existing DOM when the displayed ids are unchanged and still match
+  // what is actually in the container; otherwise reconcile to the new set.
+  let unchanged = false;
+  if (view) {
+    unchanged = view.ids.length === target.childElementCount && idsEqual(view.ids, desiredIds);
   }
 
-  const nextNodes = new Map<number, HTMLElement>();
-  const desiredNodes = lines.map((line) => {
-    const reused = view?.nodes.get(line.id) ?? createLogLineElement(line, hideSource);
-    nextNodes.set(line.id, reused);
-    return reused;
-  });
+  if (!unchanged) {
+    const nextNodes = new Map<number, HTMLElement>();
+    const desiredNodes = lines.map((line) => {
+      const reused = view?.nodes.get(line.id) ?? createLogLineElement(line, hideSourceInMessage);
+      nextNodes.set(line.id, reused);
+      return reused;
+    });
 
-  reconcileChildren(target, desiredNodes);
+    reconcileChildren(target, desiredNodes);
+    renderedViews.set(target, { ids: desiredIds, nodes: nextNodes, hideSourceInMessage });
+  }
 
-  renderedViews.set(target, { ids: desiredIds, nodes: nextNodes, hideSourceInMessage: hideSource });
-
-  applyScrollPosition(target, autoScroll, logOrder, previousScrollTop, previousScrollHeight);
-}
-
-function applyScrollPosition(
-  target: HTMLElement,
-  autoScroll: boolean,
-  logOrder: LogOrder,
-  previousScrollTop: number,
-  previousScrollHeight: number
-): void {
   if (autoScroll) {
     target.scrollTop = logOrder === 'newest-first' ? 0 : target.scrollHeight;
   } else if (logOrder === 'newest-first') {
@@ -131,8 +121,10 @@ function reconcileChildren(target: HTMLElement, desiredNodes: HTMLElement[]): vo
   for (const node of desiredNodes) {
     if (node === referenceNode) {
       referenceNode = referenceNode.nextSibling;
+    } else if (referenceNode) {
+      referenceNode.before(node);
     } else {
-      target.insertBefore(node, referenceNode);
+      target.append(node);
     }
   }
 }
