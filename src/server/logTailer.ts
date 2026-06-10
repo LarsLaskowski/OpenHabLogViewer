@@ -5,6 +5,18 @@ import { open, stat } from 'node:fs/promises';
 import { LogLineDraft, SourceConfig, SourceState, SourceStatus } from './types.js';
 import { LogLineParser } from './logLineParser.js';
 
+// Bound the amount of appended data processed in a single sync cycle. A larger
+// delta — a log burst between two polls, a backfilled file, or a file replaced
+// in place by a much larger one (same inode, so rotation is not detected) — is
+// treated like a rotation: we skip ahead and reload only the tail instead of
+// loading the whole difference into memory at once.
+const MAX_SYNC_DELTA_BYTES = 8 * 1024 * 1024;
+
+// Cap a single unterminated line. A writer that never emits a trailing newline
+// (or binary garbage in the log) must not be able to grow `pendingChunk`
+// without bound; once it exceeds this size we force-flush it as its own row.
+const MAX_PENDING_CHUNK_CHARS = 1024 * 1024;
+
 interface LogTailerOptions {
   sourceConfig: SourceConfig;
   initialLinesPerFile: number;
@@ -117,6 +129,20 @@ export class LogTailer {
     }
   }
 
+  private async skipAheadToTail(fileStats: Stats, nextFileKey: string, delta: number): Promise<void> {
+    const tailLines = await readLastLines(this.sourceConfig.filePath, this.initialLinesPerFile);
+    this.offset = fileStats.size;
+    this.currentFileKey = nextFileKey;
+    this.pendingChunk = '';
+    this.emitStatus(
+      'rotated',
+      `Skipped ${formatBytes(delta)} backlog for ${this.sourceConfig.fileName}; showing latest lines`
+    );
+    if (tailLines.length > 0) {
+      this.onLines(tailLines.map((line) => this.parser.parse(this.sourceConfig, line)));
+    }
+  }
+
   private async sync(): Promise<void> {
     if (this.syncInFlight) {
       this.syncQueued = true;
@@ -162,7 +188,13 @@ export class LogTailer {
         return;
       }
 
-      const nextChunk = await readRange(this.sourceConfig.filePath, this.offset, fileStats.size - this.offset);
+      const delta = fileStats.size - this.offset;
+      if (delta > MAX_SYNC_DELTA_BYTES) {
+        await this.skipAheadToTail(fileStats, nextFileKey, delta);
+        return;
+      }
+
+      const nextChunk = await readRange(this.sourceConfig.filePath, this.offset, delta);
       this.offset = fileStats.size;
       this.currentFileKey = nextFileKey;
 
@@ -191,6 +223,13 @@ export class LogTailer {
     }
 
     this.pendingChunk = parts.pop() ?? '';
+    if (this.pendingChunk.length > MAX_PENDING_CHUNK_CHARS) {
+      // The current physical line has no terminating newline yet but already
+      // exceeds the cap. Force-flush it as its own row so the partial buffer
+      // cannot grow without bound; any remainder starts a fresh pending line.
+      parts.push(this.pendingChunk);
+      this.pendingChunk = '';
+    }
     return parts;
   }
 
@@ -239,6 +278,16 @@ export class LogTailer {
 
 function toFileKey(fileStats: Stats): string {
   return `${fileStats.dev}:${fileStats.ino}`;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  if (bytes >= 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${bytes} B`;
 }
 
 async function readRange(filePath: string, offset: number, length: number): Promise<string> {
