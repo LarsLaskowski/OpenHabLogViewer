@@ -38,24 +38,102 @@ export function renderSourceStatuses(target: HTMLElement, statuses: SourceStatus
   target.append(fragment);
 }
 
+// Per-container render state, so consecutive renders can reuse existing row
+// elements by line id instead of recreating every node on each frame. A live
+// update only appends/removes a few rows, so reuse keeps the DOM work bounded
+// to the actual delta (see issue #44).
+interface RenderedView {
+  ids: number[];
+  nodes: Map<number, HTMLElement>;
+  hideSourceInMessage: boolean;
+}
+
+const renderedViews = new WeakMap<HTMLElement, RenderedView>();
+
 export function renderLogLines(target: HTMLElement, lines: LogLine[], autoScroll: boolean, logOrder: LogOrder, hideSourceInMessage?: boolean): void {
   const previousScrollTop = target.scrollTop;
   const previousScrollHeight = target.scrollHeight;
-  target.textContent = '';
 
-  const fragment = document.createDocumentFragment();
-  for (const line of lines) {
-    fragment.append(createLogLineElement(line, hideSourceInMessage));
+  const hideSource = hideSourceInMessage ?? false;
+  let view = renderedViews.get(target);
+
+  // Row content depends on `hideSourceInMessage`; if it changed, the cached
+  // nodes no longer match, so discard them and rebuild from scratch.
+  if (view && view.hideSourceInMessage !== hideSource) {
+    view = undefined;
   }
 
-  target.append(fragment);
+  const desiredIds = lines.map((line) => line.id);
 
+  // Fast path: the displayed ids are unchanged and still match what is actually
+  // in the DOM. Nothing to mutate beyond re-applying the scroll position.
+  if (view && target.childElementCount === view.ids.length && idsEqual(view.ids, desiredIds)) {
+    applyScrollPosition(target, autoScroll, logOrder, previousScrollTop, previousScrollHeight);
+    return;
+  }
+
+  const nextNodes = new Map<number, HTMLElement>();
+  const desiredNodes = lines.map((line) => {
+    const reused = view?.nodes.get(line.id) ?? createLogLineElement(line, hideSource);
+    nextNodes.set(line.id, reused);
+    return reused;
+  });
+
+  reconcileChildren(target, desiredNodes);
+
+  renderedViews.set(target, { ids: desiredIds, nodes: nextNodes, hideSourceInMessage: hideSource });
+
+  applyScrollPosition(target, autoScroll, logOrder, previousScrollTop, previousScrollHeight);
+}
+
+function applyScrollPosition(
+  target: HTMLElement,
+  autoScroll: boolean,
+  logOrder: LogOrder,
+  previousScrollTop: number,
+  previousScrollHeight: number
+): void {
   if (autoScroll) {
     target.scrollTop = logOrder === 'newest-first' ? 0 : target.scrollHeight;
   } else if (logOrder === 'newest-first') {
     target.scrollTop = previousScrollTop + (target.scrollHeight - previousScrollHeight);
   } else {
     target.scrollTop = previousScrollTop;
+  }
+}
+
+function idsEqual(a: number[], b: number[]): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  for (let index = 0; index < a.length; index += 1) {
+    if (a[index] !== b[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Keyed reconciliation: bring the container's children in line with
+// `desiredNodes` (already ordered) using the minimum number of DOM mutations.
+// Existing nodes that stay visible are moved at most once; only genuinely new
+// rows are inserted and only dropped rows are removed.
+function reconcileChildren(target: HTMLElement, desiredNodes: HTMLElement[]): void {
+  const desiredSet = new Set(desiredNodes);
+
+  for (const existing of Array.from(target.children)) {
+    if (!desiredSet.has(existing as HTMLElement)) {
+      existing.remove();
+    }
+  }
+
+  let referenceNode = target.firstChild;
+  for (const node of desiredNodes) {
+    if (node === referenceNode) {
+      referenceNode = referenceNode.nextSibling;
+    } else {
+      target.insertBefore(node, referenceNode);
+    }
   }
 }
 
