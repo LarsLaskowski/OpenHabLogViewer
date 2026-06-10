@@ -316,7 +316,7 @@ async function readLastLines(filePath: string, maxLines: number): Promise<string
     const chunkSize = 64 * 1024;
     let position = fileStats.size;
     const chunks: Buffer[] = [];
-    let normalizedText = '';
+    let newlineCount = 0;
 
     while (position > 0) {
       const size = Math.min(chunkSize, position);
@@ -324,18 +324,27 @@ async function readLastLines(filePath: string, maxLines: number): Promise<string
 
       const buffer = Buffer.alloc(size);
       const { bytesRead } = await fileHandle.read(buffer, 0, size, position);
-      chunks.unshift(buffer.subarray(0, bytesRead));
+      const chunk = buffer.subarray(0, bytesRead);
+      chunks.unshift(chunk);
 
-      normalizedText = Buffer.concat(chunks).toString('utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-      const completeLines = normalizedText.endsWith('\n')
-        ? normalizedText.split('\n').length - 1
-        : normalizedText.split('\n').length - 2;
+      // Count newline bytes in this raw chunk only. `\n` (0x0A) never occurs as
+      // a UTF-8 continuation byte, so a byte scan is safe and avoids decoding,
+      // normalizing and splitting the whole accumulated tail on every iteration
+      // (issue #66). Each line terminator marks one complete line, which is all
+      // we need to decide when enough lines have been collected.
+      for (let index = 0; index < chunk.length; index += 1) {
+        if (chunk[index] === 0x0a) {
+          newlineCount += 1;
+        }
+      }
 
-      if (completeLines >= maxLines) {
+      if (newlineCount >= maxLines) {
         break;
       }
     }
 
+    // Decode and normalize the collected tail exactly once, after the loop.
+    const normalizedText = Buffer.concat(chunks).toString('utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     const parts = normalizedText.split('\n');
     if (normalizedText.endsWith('\n')) {
       parts.pop();
