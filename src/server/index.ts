@@ -49,6 +49,7 @@ async function main(): Promise<void> {
 
   const app = express();
   app.disable('x-powered-by');
+  app.use(securityHeaders);
   const clientDistDir = path.resolve(process.cwd(), 'dist', 'client');
 
   const apiLimiter = rateLimit({
@@ -92,6 +93,32 @@ async function main(): Promise<void> {
 
   process.on('SIGINT', () => void shutdown());
   process.on('SIGTERM', () => void shutdown());
+}
+
+// Strict same-origin policy: the client is a single same-origin ES module, styles and
+// SVG assets are served from the same origin, and bootstrap/resync/stream all use
+// same-origin fetch/EventSource. No inline scripts or styles are used, so no relaxations
+// are required. These headers act as defense-in-depth on top of the client's consistent
+// use of textContent for rendering attacker-influenced log output.
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self'",
+  "img-src 'self'",
+  "connect-src 'self'",
+  "font-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'"
+].join('; ');
+
+function securityHeaders(_request: express.Request, response: express.Response, next: express.NextFunction): void {
+  response.setHeader('Content-Security-Policy', CONTENT_SECURITY_POLICY);
+  response.setHeader('X-Content-Type-Options', 'nosniff');
+  response.setHeader('X-Frame-Options', 'DENY');
+  response.setHeader('Referrer-Policy', 'no-referrer');
+  next();
 }
 
 function compareInitialLines(left: LogLineDraft, right: LogLineDraft): number {
