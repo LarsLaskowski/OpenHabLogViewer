@@ -80,8 +80,12 @@ export class LogTailer {
   private startWatchingDirectory(): void {
     const directory = dirname(this.sourceConfig.filePath);
     try {
-      this.watcher = watch(directory, { persistent: false }, (event: string, fileName: string | Buffer | null) => {
-        if (!fileName || fileName.toString() === this.sourceConfig.fileName || event === 'rename') {
+      this.watcher = watch(directory, { persistent: false }, (_event: string, fileName: string | Buffer | null) => {
+        // Trigger only on events for our own file. `!fileName` covers platforms that
+        // do not report the filename; renames/rotations of the watched file are still
+        // caught by the filename match and the periodic poll fallback. Events for other
+        // files in the log directory (audit logs, logrotate backups) are ignored.
+        if (!fileName || fileName.toString() === this.sourceConfig.fileName) {
           void this.sync();
         }
       });
