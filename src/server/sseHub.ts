@@ -1,5 +1,11 @@
 import { Response } from 'express';
 
+// Drop a client once its outgoing socket buffer exceeds this size. A slow or
+// stalled consumer that never drains causes Node to buffer broadcast payloads
+// in memory; under high log throughput that grows the server heap without
+// bound until the OOM killer triggers. Dropping the client bounds the cost.
+const MAX_CLIENT_BUFFER_BYTES = 1024 * 1024;
+
 interface SseClient {
   id: number;
   ip: string;
@@ -52,11 +58,29 @@ export class SseHub {
     const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 
     for (const [clientId, client] of this.clients) {
+      // A client whose socket buffer is already over the cap is not draining;
+      // writing more would only grow the server heap, so drop it instead.
+      if (client.response.writableLength > MAX_CLIENT_BUFFER_BYTES) {
+        this.dropSlowClient(clientId, client);
+        continue;
+      }
+
       try {
         client.response.write(payload);
       } catch {
         this.removeClient(clientId);
       }
+    }
+  }
+
+  private dropSlowClient(clientId: number, client: SseClient): void {
+    console.warn(
+      `[sse] Dropping slow client ${clientId} (${client.ip}): outgoing buffer ` +
+        `${client.response.writableLength} bytes exceeds ${MAX_CLIENT_BUFFER_BYTES}`
+    );
+    this.removeClient(clientId);
+    if (!client.response.writableEnded) {
+      client.response.end();
     }
   }
 
