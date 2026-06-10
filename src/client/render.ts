@@ -38,17 +38,50 @@ export function renderSourceStatuses(target: HTMLElement, statuses: SourceStatus
   target.append(fragment);
 }
 
-export function renderLogLines(target: HTMLElement, lines: LogLine[], autoScroll: boolean, logOrder: LogOrder, hideSourceInMessage?: boolean): void {
+// Per-container render state, so consecutive renders can reuse existing row
+// elements by line id instead of recreating every node on each frame. A live
+// update only appends/removes a few rows, so reuse keeps the DOM work bounded
+// to the actual delta (see issue #44).
+interface RenderedView {
+  ids: number[];
+  nodes: Map<number, HTMLElement>;
+  hideSourceInMessage: boolean;
+}
+
+const renderedViews = new WeakMap<HTMLElement, RenderedView>();
+
+export function renderLogLines(target: HTMLElement, lines: LogLine[], autoScroll: boolean, logOrder: LogOrder, hideSourceInMessage = false): void {
   const previousScrollTop = target.scrollTop;
   const previousScrollHeight = target.scrollHeight;
-  target.textContent = '';
 
-  const fragment = document.createDocumentFragment();
-  for (const line of lines) {
-    fragment.append(createLogLineElement(line, hideSourceInMessage));
+  let view = renderedViews.get(target);
+
+  // Row content depends on `hideSourceInMessage`; if it changed, the cached
+  // nodes no longer match, so discard them and rebuild from scratch.
+  if (view && view.hideSourceInMessage !== hideSourceInMessage) {
+    view = undefined;
   }
 
-  target.append(fragment);
+  const desiredIds = lines.map((line) => line.id);
+
+  // Reuse the existing DOM when the displayed ids are unchanged and still match
+  // what is actually in the container; otherwise reconcile to the new set.
+  let unchanged = false;
+  if (view) {
+    unchanged = view.ids.length === target.childElementCount && idsEqual(view.ids, desiredIds);
+  }
+
+  if (!unchanged) {
+    const nextNodes = new Map<number, HTMLElement>();
+    const desiredNodes = lines.map((line) => {
+      const reused = view?.nodes.get(line.id) ?? createLogLineElement(line, hideSourceInMessage);
+      nextNodes.set(line.id, reused);
+      return reused;
+    });
+
+    reconcileChildren(target, desiredNodes);
+    renderedViews.set(target, { ids: desiredIds, nodes: nextNodes, hideSourceInMessage });
+  }
 
   if (autoScroll) {
     target.scrollTop = logOrder === 'newest-first' ? 0 : target.scrollHeight;
@@ -56,6 +89,43 @@ export function renderLogLines(target: HTMLElement, lines: LogLine[], autoScroll
     target.scrollTop = previousScrollTop + (target.scrollHeight - previousScrollHeight);
   } else {
     target.scrollTop = previousScrollTop;
+  }
+}
+
+function idsEqual(a: number[], b: number[]): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  for (let index = 0; index < a.length; index += 1) {
+    if (a[index] !== b[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Keyed reconciliation: bring the container's children in line with
+// `desiredNodes` (already ordered) using the minimum number of DOM mutations.
+// Existing nodes that stay visible are moved at most once; only genuinely new
+// rows are inserted and only dropped rows are removed.
+function reconcileChildren(target: HTMLElement, desiredNodes: HTMLElement[]): void {
+  const desiredSet = new Set(desiredNodes);
+
+  for (const existing of Array.from(target.children)) {
+    if (!desiredSet.has(existing as HTMLElement)) {
+      existing.remove();
+    }
+  }
+
+  let referenceNode = target.firstChild;
+  for (const node of desiredNodes) {
+    if (node === referenceNode) {
+      referenceNode = referenceNode.nextSibling;
+    } else if (referenceNode) {
+      referenceNode.before(node);
+    } else {
+      target.append(node);
+    }
   }
 }
 
