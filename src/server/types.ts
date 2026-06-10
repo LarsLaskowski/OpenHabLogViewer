@@ -16,6 +16,7 @@ export interface AppConfig {
   maxBufferedLines: number;
   clientMaxRenderedLines: number;
   maxSseClients: number;
+  maxSseClientsPerIp: number;
   sources: SourceConfig[];
 }
 

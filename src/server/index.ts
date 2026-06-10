@@ -12,7 +12,7 @@ import { SseHub } from './sseHub.js';
 async function main(): Promise<void> {
   const config = loadConfig();
   const buffer = new LogBuffer(config.maxBufferedLines);
-  const sseHub = new SseHub(15_000, config.maxSseClients);
+  const sseHub = new SseHub(15_000, config.maxSseClients, config.maxSseClientsPerIp);
   const parser = new LogLineParser();
   const sourceStatuses = new Map(config.sources.map((source) => [source.source, createIdleStatus(source)]));
 

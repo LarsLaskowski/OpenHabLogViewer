@@ -57,6 +57,7 @@ export function loadConfig(): AppConfig {
     maxBufferedLines: clampInteger('MAX_BUFFERED_LINES', 2_000, 100, 1_000_000),
     clientMaxRenderedLines: clampInteger('CLIENT_MAX_RENDERED_LINES', 500, 100, 100_000),
     maxSseClients: clampInteger('MAX_SSE_CLIENTS', 10, 1, 1_000),
+    maxSseClientsPerIp: clampInteger('MAX_SSE_CLIENTS_PER_IP', 3, 1, 1_000),
     sources: [
       resolveSourceConfig('events', process.env.EVENTS_LOG_PATH, logDir, 'events.log'),
       resolveSourceConfig('openhab', process.env.OPENHAB_LOG_PATH, logDir, 'openhab.log')

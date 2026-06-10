@@ -24,8 +24,11 @@ Live web UI for `events.log` and `openhab.log` built with Node.js, Express, and 
 | `MAX_BUFFERED_LINES` | `2000` | Maximum shared server-side ring buffer size |
 | `CLIENT_MAX_RENDERED_LINES` | `500` | Maximum number of lines kept in the browser buffer |
 | `MAX_SSE_CLIENTS` | `10` | Maximum number of concurrent SSE stream connections; excess requests receive HTTP 503 |
+| `MAX_SSE_CLIENTS_PER_IP` | `3` | Maximum number of concurrent SSE stream connections per client IP; excess requests receive HTTP 503. Prevents a single client from consuming all global slots. |
 
 `EVENTS_LOG_PATH` and `OPENHAB_LOG_PATH` take precedence over `OPENHAB_LOG_DIR`.
+
+Per-IP limiting keys on the client IP as seen by the app. Behind a reverse proxy, set `TRUST_PROXY` (see [#65](https://github.com/LarsLaskowski/OpenHabLogViewer/issues/65)) so the real client IP is used instead of the proxy's.
 
 ## Development and build
 
@@ -149,6 +152,7 @@ INITIAL_LINES_PER_FILE=500
 MAX_BUFFERED_LINES=2000
 CLIENT_MAX_RENDERED_LINES=500
 MAX_SSE_CLIENTS=10
+MAX_SSE_CLIENTS_PER_IP=3
 ```
 
 Important: the service user must have read access to `/var/log/openhab/events.log` and `/var/log/openhab/openhab.log`.
