@@ -1,6 +1,6 @@
 {
   "name": "openhab-log-viewer",
-  "version": "1.2.3",
+  "version": "2.1.5",
   "private": true,
   "type": "module",
   "description": "Live web viewer for openHAB events.log and openhab.log",

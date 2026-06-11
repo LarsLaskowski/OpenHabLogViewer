@@ -48,6 +48,31 @@ function resolveSourceConfig(
   };
 }
 
+function parseTrustProxy(name: string): boolean | number | string {
+  const rawValue = process.env[name]?.trim();
+  if (!rawValue) {
+    // Default off: direct deployments must not trust spoofable X-Forwarded-For headers.
+    return false;
+  }
+
+  if (rawValue.toLowerCase() === 'true') {
+    return true;
+  }
+
+  if (rawValue.toLowerCase() === 'false') {
+    return false;
+  }
+
+  // A bare non-negative integer is treated as the number of trusted proxy hops.
+  if (/^\d+$/.test(rawValue)) {
+    return Number.parseInt(rawValue, 10);
+  }
+
+  // Anything else is passed straight to Express, which accepts preset names
+  // ('loopback', 'linklocal', 'uniquelocal') or a comma-separated list of IPs/subnets.
+  return rawValue;
+}
+
 export function loadConfig(): AppConfig {
   const logDir = process.env.OPENHAB_LOG_DIR?.trim() || '/var/log/openhab';
 
@@ -57,6 +82,8 @@ export function loadConfig(): AppConfig {
     maxBufferedLines: clampInteger('MAX_BUFFERED_LINES', 2_000, 100, 1_000_000),
     clientMaxRenderedLines: clampInteger('CLIENT_MAX_RENDERED_LINES', 500, 100, 100_000),
     maxSseClients: clampInteger('MAX_SSE_CLIENTS', 10, 1, 1_000),
+    maxSseClientsPerIp: clampInteger('MAX_SSE_CLIENTS_PER_IP', 3, 1, 1_000),
+    trustProxy: parseTrustProxy('TRUST_PROXY'),
     sources: [
       resolveSourceConfig('events', process.env.EVENTS_LOG_PATH, logDir, 'events.log'),
       resolveSourceConfig('openhab', process.env.OPENHAB_LOG_PATH, logDir, 'openhab.log')

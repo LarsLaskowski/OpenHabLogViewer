@@ -5,6 +5,18 @@ import { open, stat } from 'node:fs/promises';
 import { LogLineDraft, SourceConfig, SourceState, SourceStatus } from './types.js';
 import { LogLineParser } from './logLineParser.js';
 
+// Bound the amount of appended data processed in a single sync cycle. A larger
+// delta — a log burst between two polls, a backfilled file, or a file replaced
+// in place by a much larger one (same inode, so rotation is not detected) — is
+// treated like a rotation: we skip ahead and reload only the tail instead of
+// loading the whole difference into memory at once.
+const MAX_SYNC_DELTA_BYTES = 8 * 1024 * 1024;
+
+// Cap a single unterminated line. A writer that never emits a trailing newline
+// (or binary garbage in the log) must not be able to grow `pendingChunk`
+// without bound; once it exceeds this size we force-flush it as its own row.
+const MAX_PENDING_CHUNK_CHARS = 1024 * 1024;
+
 interface LogTailerOptions {
   sourceConfig: SourceConfig;
   initialLinesPerFile: number;
@@ -80,8 +92,12 @@ export class LogTailer {
   private startWatchingDirectory(): void {
     const directory = dirname(this.sourceConfig.filePath);
     try {
-      this.watcher = watch(directory, { persistent: false }, (event: string, fileName: string | Buffer | null) => {
-        if (!fileName || fileName.toString() === this.sourceConfig.fileName || event === 'rename') {
+      this.watcher = watch(directory, { persistent: false }, (_event: string, fileName: string | Buffer | null) => {
+        // Trigger only on events for our own file. `!fileName` covers platforms that
+        // do not report the filename; renames/rotations of the watched file are still
+        // caught by the filename match and the periodic poll fallback. Events for other
+        // files in the log directory (audit logs, logrotate backups) are ignored.
+        if (!fileName || fileName.toString() === this.sourceConfig.fileName) {
           void this.sync();
         }
       });
@@ -110,6 +126,20 @@ export class LogTailer {
     this.emitStatus('watching', `Reattached to ${this.sourceConfig.fileName}`);
     if (reattachedLines.length > 0) {
       this.onLines(reattachedLines.map((line) => this.parser.parse(this.sourceConfig, line)));
+    }
+  }
+
+  private async skipAheadToTail(fileStats: Stats, nextFileKey: string, delta: number): Promise<void> {
+    const tailLines = await readLastLines(this.sourceConfig.filePath, this.initialLinesPerFile);
+    this.offset = fileStats.size;
+    this.currentFileKey = nextFileKey;
+    this.pendingChunk = '';
+    this.emitStatus(
+      'rotated',
+      `Skipped ${formatBytes(delta)} backlog for ${this.sourceConfig.fileName}; showing latest lines`
+    );
+    if (tailLines.length > 0) {
+      this.onLines(tailLines.map((line) => this.parser.parse(this.sourceConfig, line)));
     }
   }
 
@@ -158,7 +188,13 @@ export class LogTailer {
         return;
       }
 
-      const nextChunk = await readRange(this.sourceConfig.filePath, this.offset, fileStats.size - this.offset);
+      const delta = fileStats.size - this.offset;
+      if (delta > MAX_SYNC_DELTA_BYTES) {
+        await this.skipAheadToTail(fileStats, nextFileKey, delta);
+        return;
+      }
+
+      const nextChunk = await readRange(this.sourceConfig.filePath, this.offset, delta);
       this.offset = fileStats.size;
       this.currentFileKey = nextFileKey;
 
@@ -187,6 +223,13 @@ export class LogTailer {
     }
 
     this.pendingChunk = parts.pop() ?? '';
+    if (this.pendingChunk.length > MAX_PENDING_CHUNK_CHARS) {
+      // The current physical line has no terminating newline yet but already
+      // exceeds the cap. Force-flush it as its own row so the partial buffer
+      // cannot grow without bound; any remainder starts a fresh pending line.
+      parts.push(this.pendingChunk);
+      this.pendingChunk = '';
+    }
     return parts;
   }
 
@@ -237,6 +280,16 @@ function toFileKey(fileStats: Stats): string {
   return `${fileStats.dev}:${fileStats.ino}`;
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  if (bytes >= 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${bytes} B`;
+}
+
 async function readRange(filePath: string, offset: number, length: number): Promise<string> {
   if (length <= 0) {
     return '';
@@ -263,7 +316,7 @@ async function readLastLines(filePath: string, maxLines: number): Promise<string
     const chunkSize = 64 * 1024;
     let position = fileStats.size;
     const chunks: Buffer[] = [];
-    let normalizedText = '';
+    let newlineCount = 0;
 
     while (position > 0) {
       const size = Math.min(chunkSize, position);
@@ -271,18 +324,27 @@ async function readLastLines(filePath: string, maxLines: number): Promise<string
 
       const buffer = Buffer.alloc(size);
       const { bytesRead } = await fileHandle.read(buffer, 0, size, position);
-      chunks.unshift(buffer.subarray(0, bytesRead));
+      const chunk = buffer.subarray(0, bytesRead);
+      chunks.unshift(chunk);
 
-      normalizedText = Buffer.concat(chunks).toString('utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-      const completeLines = normalizedText.endsWith('\n')
-        ? normalizedText.split('\n').length - 1
-        : normalizedText.split('\n').length - 2;
+      // Count newline bytes in this raw chunk only. `\n` (0x0A) never occurs as
+      // a UTF-8 continuation byte, so a byte scan is safe and avoids decoding,
+      // normalizing and splitting the whole accumulated tail on every iteration
+      // (issue #66). Each line terminator marks one complete line, which is all
+      // we need to decide when enough lines have been collected.
+      for (let index = 0; index < chunk.length; index += 1) {
+        if (chunk[index] === 0x0a) {
+          newlineCount += 1;
+        }
+      }
 
-      if (completeLines >= maxLines) {
+      if (newlineCount >= maxLines) {
         break;
       }
     }
 
+    // Decode and normalize the collected tail exactly once, after the loop.
+    const normalizedText = Buffer.concat(chunks).toString('utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     const parts = normalizedText.split('\n');
     if (normalizedText.endsWith('\n')) {
       parts.pop();

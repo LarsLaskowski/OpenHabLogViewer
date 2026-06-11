@@ -16,6 +16,8 @@ export interface AppConfig {
   maxBufferedLines: number;
   clientMaxRenderedLines: number;
   maxSseClients: number;
+  maxSseClientsPerIp: number;
+  trustProxy: boolean | number | string;
   sources: SourceConfig[];
 }
 

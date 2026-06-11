@@ -1,7 +1,7 @@
 export type LogLevel = 'TRACE' | 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 export type LogSource = 'events' | 'openhab';
 export type SourceState = 'idle' | 'watching' | 'missing' | 'permission-denied' | 'rotated' | 'error';
-export type ConnectionState = 'connecting' | 'connected' | 'reconnecting';
+export type ConnectionState = 'connecting' | 'connected' | 'reconnecting' | 'error';
 export type Theme = 'light' | 'dark';
 export type LogOrder = 'newest-first' | 'oldest-first';
 export const CLIENT_MAX_RENDERED_LINES_CAP = 500;
