@@ -6,6 +6,8 @@ export function renderConnectionStatus(target: HTMLElement, connectionState: Con
     target.textContent = 'Connected';
   } else if (connectionState === 'reconnecting') {
     target.textContent = 'Reconnecting';
+  } else if (connectionState === 'error') {
+    target.textContent = 'Connection failed';
   } else {
     target.textContent = 'Connecting';
   }

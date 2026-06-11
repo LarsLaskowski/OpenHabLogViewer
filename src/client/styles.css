@@ -306,6 +306,11 @@ body {
   color: var(--status-success-text);
 }
 
+.connection-error {
+  background: var(--badge-error-bg);
+  color: var(--badge-error-text);
+}
+
 .source-badge.source-events {
   background: var(--badge-events-bg);
   color: var(--badge-events-text);
