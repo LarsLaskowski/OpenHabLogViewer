@@ -50,6 +50,13 @@ const brandImageElement = getRequiredImage('app-brand-image');
 let initialStreamOpenTiming: CompleteClientTiming | null = null;
 let reconnectTiming: CompleteClientTiming | null = null;
 let hasSeenStreamOpen = false;
+// Stale-connection watchdog: the server emits a heartbeat every 15 s, so if no
+// event (heartbeat or data) arrives within ~2x that window the connection is
+// treated as half-open and force-reconnected. EventSource only fires `error`
+// on a closed socket, not on a silently stalled one.
+const HEARTBEAT_WATCHDOG_MS = 35_000;
+let activeStream: EventSource | null = null;
+let heartbeatWatchdogHandle: ReturnType<typeof globalThis.setTimeout> | null = null;
 let hiddenSinceMs: number | null = document.visibilityState === 'hidden' ? performance.now() : null;
 let pendingVisibleRenderSinceMs: number | null = null;
 let pendingVisibleSseSinceMs: number | null = null;
@@ -278,16 +285,57 @@ function bindControls(): void {
   });
 }
 
+function noteStreamActivity(): void {
+  if (heartbeatWatchdogHandle !== null) {
+    globalThis.clearTimeout(heartbeatWatchdogHandle);
+  }
+  heartbeatWatchdogHandle = globalThis.setTimeout(handleStaleConnection, HEARTBEAT_WATCHDOG_MS);
+}
+
+function clearHeartbeatWatchdog(): void {
+  if (heartbeatWatchdogHandle !== null) {
+    globalThis.clearTimeout(heartbeatWatchdogHandle);
+    heartbeatWatchdogHandle = null;
+  }
+}
+
+function closeActiveStream(): void {
+  clearHeartbeatWatchdog();
+  if (activeStream) {
+    activeStream.close();
+    activeStream = null;
+  }
+}
+
+function handleStaleConnection(): void {
+  performanceMonitor.recordEvent('connection', 'heartbeat-timeout', {
+    visibilityState: document.visibilityState
+  });
+  if (hasSeenStreamOpen && reconnectTiming === null) {
+    reconnectTiming = performanceMonitor.startTiming('connection', 'reconnect', {
+      visibilityState: document.visibilityState
+    });
+  }
+  state.connectionState = 'reconnecting';
+  syncState.pendingResyncAfterOpen = true;
+  markConnectionRenderPending();
+  // connectStream() closes the stalled EventSource before opening a fresh one.
+  connectStream();
+}
+
 function connectStream(): void {
+  closeActiveStream();
   performanceMonitor.recordEvent('connection', 'stream-created', {
     visibilityState: document.visibilityState
   });
   const stream = new EventSource('/api/stream');
+  activeStream = stream;
 
   stream.addEventListener('open', () => {
     const wasReconnecting = state.connectionState === 'reconnecting';
     const shouldResync = syncState.pendingResyncAfterOpen;
     state.connectionState = 'connected';
+    noteStreamActivity();
     markConnectionRenderPending();
 
     if (!hasSeenStreamOpen) {
@@ -318,6 +366,9 @@ function connectStream(): void {
   });
 
   stream.addEventListener('error', () => {
+    // The socket is closed; EventSource auto-reconnects on its own, so pause the
+    // watchdog until the next `open` restarts it.
+    clearHeartbeatWatchdog();
     if (hasSeenStreamOpen && reconnectTiming === null) {
       reconnectTiming = performanceMonitor.startTiming('connection', 'reconnect', {
         visibilityState: document.visibilityState
@@ -334,7 +385,12 @@ function connectStream(): void {
     });
   });
 
+  stream.addEventListener('heartbeat', () => {
+    noteStreamActivity();
+  });
+
   stream.addEventListener('source-status', (event) => {
+    noteStreamActivity();
     const completeSseTiming = performanceMonitor.startTiming('sse', 'source-status', {
       visibilityState: document.visibilityState
     });
@@ -355,6 +411,7 @@ function connectStream(): void {
   });
 
   stream.addEventListener('log-line', (event) => {
+    noteStreamActivity();
     const completeSseTiming = performanceMonitor.startTiming('sse', 'log-line', {
       bufferedBefore: state.lines.length,
       paused: state.paused,
