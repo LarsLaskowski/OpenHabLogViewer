@@ -56,6 +56,10 @@ let pendingVisibleSseSinceMs: number | null = null;
 let pendingVisibleConnectionSinceMs: number | null = null;
 let searchInputDebounceHandle: ReturnType<typeof globalThis.setTimeout> | null = null;
 let preferencesPersistDebounceHandle: ReturnType<typeof globalThis.setTimeout> | null = null;
+const BOOTSTRAP_RETRY_BASE_MS = 1_000;
+const BOOTSTRAP_RETRY_MAX_MS = 30_000;
+let bootstrapRetryHandle: ReturnType<typeof globalThis.setTimeout> | null = null;
+let bootstrapRetryAttempt = 0;
 const pendingLiveRender: PendingLiveRenderState = {
   frameId: null,
   logLines: false,
@@ -100,19 +104,28 @@ async function bootstrap(): Promise<void> {
     logOrder: state.logOrder
   });
 
-  const completeFetchTiming = performanceMonitor.startTiming('bootstrap', 'fetch-bootstrap');
-  const response = await fetch('/api/bootstrap');
-  completeFetchTiming({
-    ok: response.ok,
-    status: response.status
-  });
+  // Bind controls up front so the UI stays interactive even if the initial
+  // data load fails and has to retry. This runs exactly once.
+  const completeBindTiming = performanceMonitor.startTiming('bootstrap', 'bind-controls');
+  bindControls();
+  completeBindTiming();
 
-  const completeParseTiming = performanceMonitor.startTiming('bootstrap', 'parse-bootstrap-payload');
-  const payload = (await response.json()) as BootstrapResponse;
-  completeParseTiming({
-    lineCount: payload.lines.length,
-    statusCount: payload.statuses.length
-  });
+  await loadInitialData(completeBootstrapTiming);
+}
+
+async function loadInitialData(completeBootstrapTiming: CompleteClientTiming): Promise<void> {
+  let payload: BootstrapResponse;
+  try {
+    payload = await fetchBootstrapPayload();
+  } catch (error) {
+    scheduleBootstrapRetry(completeBootstrapTiming, error);
+    return;
+  }
+
+  bootstrapRetryAttempt = 0;
+  if (state.connectionState === 'error') {
+    state.connectionState = 'connecting';
+  }
 
   const completeHydrationTiming = performanceMonitor.startTiming('bootstrap', 'hydrate-state');
   applyBootstrapPayload(payload);
@@ -122,10 +135,6 @@ async function bootstrap(): Promise<void> {
     serverMaxSyncLines: syncState.serverMaxSyncLines,
     truncated: payload.cursor.truncated
   });
-
-  const completeBindTiming = performanceMonitor.startTiming('bootstrap', 'bind-controls');
-  bindControls();
-  completeBindTiming();
 
   const displayedLines = renderAll('bootstrap');
   completeBootstrapTiming({
@@ -139,6 +148,49 @@ async function bootstrap(): Promise<void> {
   });
   syncState.pendingResyncAfterOpen = true;
   connectStream();
+}
+
+async function fetchBootstrapPayload(): Promise<BootstrapResponse> {
+  const completeFetchTiming = performanceMonitor.startTiming('bootstrap', 'fetch-bootstrap');
+  const response = await fetch('/api/bootstrap');
+  completeFetchTiming({
+    ok: response.ok,
+    status: response.status
+  });
+  if (!response.ok) {
+    throw new Error(`Bootstrap request failed with status ${response.status}`);
+  }
+
+  const completeParseTiming = performanceMonitor.startTiming('bootstrap', 'parse-bootstrap-payload');
+  const payload = (await response.json()) as BootstrapResponse;
+  completeParseTiming({
+    lineCount: payload.lines.length,
+    statusCount: payload.statuses.length
+  });
+  return payload;
+}
+
+function scheduleBootstrapRetry(completeBootstrapTiming: CompleteClientTiming, error: unknown): void {
+  state.connectionState = 'error';
+  renderConnectionStatus(connectionStatusElement, state.connectionState);
+
+  const delayMs = Math.min(BOOTSTRAP_RETRY_BASE_MS * 2 ** bootstrapRetryAttempt, BOOTSTRAP_RETRY_MAX_MS);
+  bootstrapRetryAttempt += 1;
+  console.warn(`[bootstrap] Initial data load failed; retrying in ${delayMs} ms.`, error);
+  performanceMonitor.recordEvent('bootstrap', 'retry-scheduled', {
+    attempt: bootstrapRetryAttempt,
+    delayMs
+  });
+
+  if (bootstrapRetryHandle !== null) {
+    globalThis.clearTimeout(bootstrapRetryHandle);
+  }
+  bootstrapRetryHandle = globalThis.setTimeout(() => {
+    bootstrapRetryHandle = null;
+    state.connectionState = 'connecting';
+    renderConnectionStatus(connectionStatusElement, state.connectionState);
+    void loadInitialData(completeBootstrapTiming);
+  }, delayMs);
 }
 
 function bindControls(): void {
