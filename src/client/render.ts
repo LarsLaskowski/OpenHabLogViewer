@@ -53,8 +53,11 @@ interface RenderedView {
 const renderedViews = new WeakMap<HTMLElement, RenderedView>();
 
 export function renderLogLines(target: HTMLElement, lines: LogLine[], autoScroll: boolean, logOrder: LogOrder, hideSourceInMessage = false): void {
+  const documentScroller = target.ownerDocument.scrollingElement ?? target.ownerDocument.documentElement;
   const previousScrollTop = target.scrollTop;
   const previousScrollHeight = target.scrollHeight;
+  const previousDocumentScrollTop = documentScroller.scrollTop;
+  const previousDocumentScrollHeight = documentScroller.scrollHeight;
 
   let view = renderedViews.get(target);
 
@@ -85,12 +88,26 @@ export function renderLogLines(target: HTMLElement, lines: LogLine[], autoScroll
     renderedViews.set(target, { ids: desiredIds, nodes: nextNodes, hideSourceInMessage });
   }
 
+  // The container only scrolls itself when its content overflows a constrained
+  // height; otherwise it grows with its content and the page is the scroller.
+  const containerScrolls = target.scrollHeight > target.clientHeight;
+  if (containerScrolls) {
+    if (autoScroll) {
+      target.scrollTop = logOrder === 'newest-first' ? 0 : target.scrollHeight;
+    } else if (logOrder === 'newest-first') {
+      target.scrollTop = previousScrollTop + (target.scrollHeight - previousScrollHeight);
+    } else {
+      target.scrollTop = previousScrollTop;
+    }
+    return;
+  }
+
   if (autoScroll) {
-    target.scrollTop = logOrder === 'newest-first' ? 0 : target.scrollHeight;
+    documentScroller.scrollTop = logOrder === 'newest-first' ? 0 : documentScroller.scrollHeight;
   } else if (logOrder === 'newest-first') {
-    target.scrollTop = previousScrollTop + (target.scrollHeight - previousScrollHeight);
+    documentScroller.scrollTop = previousDocumentScrollTop + (documentScroller.scrollHeight - previousDocumentScrollHeight);
   } else {
-    target.scrollTop = previousScrollTop;
+    documentScroller.scrollTop = previousDocumentScrollTop;
   }
 }
 
