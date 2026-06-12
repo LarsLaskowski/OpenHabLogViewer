@@ -125,42 +125,116 @@ Because the server is bundled to `dist/server/index.cjs`, the target host only n
 
 ## systemd installation on Linux
 
-The first version is designed for systemd-based operation. `deploy/systemd/openhab-log-viewer.service` assumes the application is installed in `/opt/openhab-log-viewer`.
+This section is a complete walkthrough for running the viewer as a background service on a Linux host with systemd. It works both for the deploy package described above and for a checkout you built yourself. The bundled unit file `deploy/systemd/openhab-log-viewer.service` assumes the application lives in `/opt/openhab-log-viewer` and runs as the `openhab` user.
 
-Example for copying the deploy package to the target host:
+### Prerequisites
+
+- A Linux host with **systemd** (the default on Debian, Ubuntu, Raspberry Pi OS, Fedora, etc.).
+- **Node.js 20 or newer** installed on the target host. Check with `node --version`. Because the server is bundled into a single `dist/server/index.cjs` file, this is the only runtime dependency — you do **not** need to run `npm install` on the target host.
+- The `openhab` user. On a standard openHAB installation it already exists and owns the log files. If it does not exist, create a dedicated service user:
+
+  ```bash
+  sudo useradd --system --no-create-home --shell /usr/sbin/nologin openhab
+  ```
+
+  If you prefer a different user, change the `User=` line in the service file in step 3.
+
+### 1. Copy the files to the target host
+
+Copy the deploy package (or your built project, including at least `dist/`, `package.json`, and the `deploy/` folder) to the host and place it under `/opt/openhab-log-viewer`:
 
 ```bash
+# From your build machine
 scp -r deploy-package/ user@host:/tmp/openhab-log-viewer
+
+# On the target host
 sudo mkdir -p /opt/openhab-log-viewer
 sudo cp -r /tmp/openhab-log-viewer/* /opt/openhab-log-viewer/
 ```
 
-Install the service:
+Give the service user ownership of the application directory:
 
 ```bash
-sudo cp deploy/systemd/openhab-log-viewer.service /etc/systemd/system/
+sudo chown -R openhab:openhab /opt/openhab-log-viewer
+```
+
+### 2. Make sure the service user can read the logs
+
+The service user (`openhab` by default) must have **read** access to the files it tails:
+
+```bash
+sudo -u openhab head -n1 /var/log/openhab/events.log
+sudo -u openhab head -n1 /var/log/openhab/openhab.log
+```
+
+If both commands print a line, permissions are fine. On a standard openHAB install the `openhab` user already owns these files. If you run the viewer under a different user, add that user to the group that owns the logs (often `openhab`), for example:
+
+```bash
+sudo usermod -aG openhab youruser
+```
+
+A `permission-denied` source status in the UI almost always means this step is missing.
+
+### 3. Install and start the service
+
+```bash
+sudo cp /opt/openhab-log-viewer/deploy/systemd/openhab-log-viewer.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now openhab-log-viewer
+```
+
+Check that it is running and follow its log output:
+
+```bash
 sudo systemctl status openhab-log-viewer
 journalctl -u openhab-log-viewer -f
 ```
 
-You can optionally provide environment values in `/etc/default/openhab-log-viewer`, for example:
+Then open `http://<host-ip>:9001` in a browser. With the default `PORT=9001`, the viewer is reachable on port 9001.
+
+### 4. Configure environment values (optional)
+
+The service file ships with sensible defaults baked in via `Environment=` lines. To override any setting without editing the unit file, create `/etc/default/openhab-log-viewer` — it is read automatically through the `EnvironmentFile=-/etc/default/openhab-log-viewer` directive:
 
 ```ini
 PORT=9001
 EVENTS_LOG_PATH=/var/log/openhab/events.log
 OPENHAB_LOG_PATH=/var/log/openhab/openhab.log
 INITIAL_LINES_PER_FILE=500
-MAX_BUFFERED_LINES=2000
-CLIENT_MAX_RENDERED_LINES=500
+MAX_BUFFERED_LINES=10000
+CLIENT_MAX_RENDERED_LINES=1500
 MAX_SSE_CLIENTS=10
 MAX_SSE_CLIENTS_PER_IP=3
 # Set to the number of proxy hops when running behind a reverse proxy:
 # TRUST_PROXY=1
 ```
 
-Important: the service user must have read access to `/var/log/openhab/events.log` and `/var/log/openhab/openhab.log`.
+See the [Configuration](#configuration) table for every available variable. Apply changes with:
+
+```bash
+sudo systemctl restart openhab-log-viewer
+```
+
+### Updating to a new version
+
+Copy the new `dist/` directory over the existing installation, restore ownership, and restart the service:
+
+```bash
+sudo cp -r /tmp/openhab-log-viewer/dist/* /opt/openhab-log-viewer/dist/
+sudo chown -R openhab:openhab /opt/openhab-log-viewer
+sudo systemctl restart openhab-log-viewer
+```
+
+### Uninstalling
+
+```bash
+sudo systemctl disable --now openhab-log-viewer
+sudo rm /etc/systemd/system/openhab-log-viewer.service
+sudo systemctl daemon-reload
+sudo rm -rf /opt/openhab-log-viewer
+# Optional, if you created a dedicated environment file:
+sudo rm -f /etc/default/openhab-log-viewer
+```
 
 ## Operating notes
 
