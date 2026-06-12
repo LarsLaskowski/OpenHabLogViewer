@@ -2,6 +2,8 @@
 
 Live web UI for `events.log` and `openhab.log` built with Node.js, Express, and Server-Sent Events. Every physical log file line stays visible as its own UI row; continuation lines stay grouped under their timestamped parent entry.
 
+![OpenHab Log Viewer screenshot](docs/images/openhablogviewer.png)
+
 ## Features
 
 - Initial load of the latest configured lines from `events.log` and `openhab.log`
