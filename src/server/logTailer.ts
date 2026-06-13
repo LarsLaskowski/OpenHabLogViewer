@@ -17,6 +17,14 @@ const MAX_SYNC_DELTA_BYTES = 8 * 1024 * 1024;
 // without bound; once it exceeds this size we force-flush it as its own row.
 const MAX_PENDING_CHUNK_CHARS = 1024 * 1024;
 
+// Bound the bytes scanned backward when reading the tail of a file for
+// bootstrap / reattach / skip-ahead. `readLastLines` normally stops once it has
+// seen enough line terminators, but a file with very few or no newlines (a huge
+// single line, or binary garbage) would otherwise be read entirely into memory.
+// This cap bounds that cost; when it is hit we keep only the bytes scanned so
+// far and drop the leading partial line.
+const MAX_TAIL_SCAN_BYTES = 8 * 1024 * 1024;
+
 interface LogTailerOptions {
   sourceConfig: SourceConfig;
   initialLinesPerFile: number;
@@ -80,8 +88,8 @@ export class LogTailer {
       return [];
     }
 
-    const lines = await readLastLines(this.sourceConfig.filePath, this.initialLinesPerFile);
-    this.offset = fileStats.size;
+    const { lines, size } = await readLastLines(this.sourceConfig.filePath, this.initialLinesPerFile);
+    this.offset = size;
     this.currentFileKey = toFileKey(fileStats);
     this.hasLoadedInitialLines = true;
     this.emitStatus('watching', `Watching ${this.sourceConfig.fileName}`);
@@ -107,39 +115,39 @@ export class LogTailer {
     }
   }
 
-  private async handleInitialLoad(fileStats: Stats, nextFileKey: string): Promise<void> {
-    const initialLines = await readLastLines(this.sourceConfig.filePath, this.initialLinesPerFile);
-    this.offset = fileStats.size;
+  private async handleInitialLoad(nextFileKey: string): Promise<void> {
+    const { lines, size } = await readLastLines(this.sourceConfig.filePath, this.initialLinesPerFile);
+    this.offset = size;
     this.currentFileKey = nextFileKey;
     this.hasLoadedInitialLines = true;
     this.emitStatus('watching', `Watching ${this.sourceConfig.fileName}`);
-    if (initialLines.length > 0) {
-      this.onLines(initialLines.map((line) => this.parser.parse(this.sourceConfig, line)));
+    if (lines.length > 0) {
+      this.onLines(lines.map((line) => this.parser.parse(this.sourceConfig, line)));
     }
   }
 
-  private async handleReattach(fileStats: Stats, nextFileKey: string): Promise<void> {
-    const reattachedLines = await readLastLines(this.sourceConfig.filePath, this.initialLinesPerFile);
-    this.offset = fileStats.size;
+  private async handleReattach(nextFileKey: string): Promise<void> {
+    const { lines, size } = await readLastLines(this.sourceConfig.filePath, this.initialLinesPerFile);
+    this.offset = size;
     this.currentFileKey = nextFileKey;
     this.pendingChunk = '';
     this.emitStatus('watching', `Reattached to ${this.sourceConfig.fileName}`);
-    if (reattachedLines.length > 0) {
-      this.onLines(reattachedLines.map((line) => this.parser.parse(this.sourceConfig, line)));
+    if (lines.length > 0) {
+      this.onLines(lines.map((line) => this.parser.parse(this.sourceConfig, line)));
     }
   }
 
-  private async skipAheadToTail(fileStats: Stats, nextFileKey: string, delta: number): Promise<void> {
-    const tailLines = await readLastLines(this.sourceConfig.filePath, this.initialLinesPerFile);
-    this.offset = fileStats.size;
+  private async skipAheadToTail(nextFileKey: string, delta: number): Promise<void> {
+    const { lines, size } = await readLastLines(this.sourceConfig.filePath, this.initialLinesPerFile);
+    this.offset = size;
     this.currentFileKey = nextFileKey;
     this.pendingChunk = '';
     this.emitStatus(
       'rotated',
       `Skipped ${formatBytes(delta)} backlog for ${this.sourceConfig.fileName}; showing latest lines`
     );
-    if (tailLines.length > 0) {
-      this.onLines(tailLines.map((line) => this.parser.parse(this.sourceConfig, line)));
+    if (lines.length > 0) {
+      this.onLines(lines.map((line) => this.parser.parse(this.sourceConfig, line)));
     }
   }
 
@@ -159,12 +167,12 @@ export class LogTailer {
       const nextFileKey = toFileKey(fileStats);
 
       if (!this.hasLoadedInitialLines) {
-        await this.handleInitialLoad(fileStats, nextFileKey);
+        await this.handleInitialLoad(nextFileKey);
         return;
       }
 
       if (!this.currentFileKey) {
-        await this.handleReattach(fileStats, nextFileKey);
+        await this.handleReattach(nextFileKey);
         return;
       }
 
@@ -190,7 +198,7 @@ export class LogTailer {
 
       const delta = fileStats.size - this.offset;
       if (delta > MAX_SYNC_DELTA_BYTES) {
-        await this.skipAheadToTail(fileStats, nextFileKey, delta);
+        await this.skipAheadToTail(nextFileKey, delta);
         return;
       }
 
@@ -305,18 +313,28 @@ async function readRange(filePath: string, offset: number, length: number): Prom
   }
 }
 
-async function readLastLines(filePath: string, maxLines: number): Promise<string[]> {
+interface TailRead {
+  lines: string[];
+  // File size observed while reading the tail. Callers use this as the next read
+  // offset so that bytes appended after this point are picked up by the next
+  // sync cycle instead of being re-emitted (which would duplicate rows).
+  size: number;
+}
+
+async function readLastLines(filePath: string, maxLines: number): Promise<TailRead> {
   const fileHandle = await open(filePath, 'r');
   try {
     const fileStats = await fileHandle.stat();
     if (fileStats.size === 0) {
-      return [];
+      return { lines: [], size: fileStats.size };
     }
 
     const chunkSize = 64 * 1024;
     let position = fileStats.size;
     const chunks: Buffer[] = [];
     let newlineCount = 0;
+    let scannedBytes = 0;
+    let scanTruncated = false;
 
     while (position > 0) {
       const size = Math.min(chunkSize, position);
@@ -326,6 +344,7 @@ async function readLastLines(filePath: string, maxLines: number): Promise<string
       const { bytesRead } = await fileHandle.read(buffer, 0, size, position);
       const chunk = buffer.subarray(0, bytesRead);
       chunks.unshift(chunk);
+      scannedBytes += chunk.length;
 
       // Count newline bytes in this raw chunk only. `\n` (0x0A) never occurs as
       // a UTF-8 continuation byte, so a byte scan is safe and avoids decoding,
@@ -341,6 +360,14 @@ async function readLastLines(filePath: string, maxLines: number): Promise<string
       if (newlineCount >= maxLines) {
         break;
       }
+
+      // Stop before the accumulated tail can grow without bound on a file with
+      // too few newlines. If we stop here mid-file, the leading line is partial
+      // and is dropped below.
+      if (scannedBytes >= MAX_TAIL_SCAN_BYTES) {
+        scanTruncated = position > 0;
+        break;
+      }
     }
 
     // Decode and normalize the collected tail exactly once, after the loop.
@@ -350,7 +377,15 @@ async function readLastLines(filePath: string, maxLines: number): Promise<string
       parts.pop();
     }
 
-    return parts.slice(-maxLines);
+    // When the scan stopped at the byte cap rather than a start-of-file or
+    // line-terminator boundary, the first element was cut mid-line; drop it so
+    // we never surface a partial line. (In the normal case `slice(-maxLines)`
+    // already discards any leading partial.)
+    if (scanTruncated && parts.length > 0) {
+      parts.shift();
+    }
+
+    return { lines: parts.slice(-maxLines), size: fileStats.size };
   } finally {
     await fileHandle.close();
   }
