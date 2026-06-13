@@ -19,5 +19,33 @@ ExecStart=/usr/bin/node dist/server/index.cjs
 Restart=always
 RestartSec=5
 
+# Sandboxing / hardening. The viewer only reads log files and serves a bundled
+# client over TCP; it never writes to disk and needs no privileges, so it runs
+# in a tightly confined sandbox. With ProtectSystem=strict the whole filesystem
+# is read-only, so logs outside /var/log/openhab can still be read but nothing
+# is writable (no path needs to be). MemoryDenyWriteExecute is intentionally NOT
+# set because it breaks V8's JIT and would crash Node. These directives require
+# a reasonably modern systemd (v245+), which all current target distros ship.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
 [Install]
 WantedBy=multi-user.target
