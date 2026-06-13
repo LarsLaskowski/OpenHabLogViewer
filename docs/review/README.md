@@ -35,7 +35,7 @@ with a status marker, so progress is always visible.
 | 2 | Client | [`phase-2-client.md`](./phase-2-client.md) | 7 | ✅ |
 | 3 | Build & config | [`phase-3-build-config.md`](./phase-3-build-config.md) | 4 | ✅ |
 | 4 | CI/CD & deployment | [`phase-4-cicd-deploy.md`](./phase-4-cicd-deploy.md) | 4 | ✅ |
-| 5 | Docs, meta & assets | [`phase-5-docs-meta-assets.md`](./phase-5-docs-meta-assets.md) | 25 | ⬜ |
+| 5 | Docs, meta & assets | [`phase-5-docs-meta-assets.md`](./phase-5-docs-meta-assets.md) | 25 | ✅ |
 | 6 | Synthesis | [`phase-6-synthesis.md`](./phase-6-synthesis.md) | — | ⬜ |
 
 **Total tracked files: 48** (phases 1–5 cover all of them; phase 6 is the
