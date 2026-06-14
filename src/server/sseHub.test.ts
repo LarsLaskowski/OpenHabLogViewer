@@ -29,7 +29,7 @@ describe('SseHub', () => {
     const hub = new SseHub(NO_HEARTBEAT, 10, 3);
     try {
       const res = new FakeResponse();
-      hub.addClient(asResponse(res), '1.1.1.1');
+      hub.addClient(asResponse(res), 'client-a');
       assert.equal(hub.clientCount, 1);
       assert.equal(res.writes[0], 'retry: 3000\n\n');
     } finally {
@@ -42,8 +42,8 @@ describe('SseHub', () => {
     try {
       const a = new FakeResponse();
       const b = new FakeResponse();
-      hub.addClient(asResponse(a), '1.1.1.1');
-      hub.addClient(asResponse(b), '2.2.2.2');
+      hub.addClient(asResponse(a), 'client-a');
+      hub.addClient(asResponse(b), 'client-b');
       hub.broadcast('log-line', { id: 7 });
 
       const expected = 'event: log-line\ndata: {"id":7}\n\n';
@@ -58,9 +58,9 @@ describe('SseHub', () => {
     const hub = new SseHub(NO_HEARTBEAT, 2, 1);
     try {
       assert.equal(hub.isFull(), false);
-      hub.addClient(asResponse(new FakeResponse()), '1.1.1.1');
-      assert.equal(hub.isFullForIp('1.1.1.1'), true);
-      hub.addClient(asResponse(new FakeResponse()), '2.2.2.2');
+      hub.addClient(asResponse(new FakeResponse()), 'client-a');
+      assert.equal(hub.isFullForIp('client-a'), true);
+      hub.addClient(asResponse(new FakeResponse()), 'client-b');
       assert.equal(hub.isFull(), true);
     } finally {
       hub.close();
@@ -72,7 +72,7 @@ describe('SseHub', () => {
     try {
       const slow = new FakeResponse();
       slow.writableLength = 2 * 1024 * 1024; // over the 1 MB cap
-      hub.addClient(asResponse(slow), '1.1.1.1');
+      hub.addClient(asResponse(slow), 'client-a');
       assert.equal(hub.clientCount, 1);
 
       hub.broadcast('log-line', { id: 1 });
@@ -87,8 +87,8 @@ describe('SseHub', () => {
     const hub = new SseHub(NO_HEARTBEAT, 10, 3);
     try {
       const res = new FakeResponse();
-      const dispose = hub.addClient(asResponse(res), '1.1.1.1');
-      assert.equal(hub.isFullForIp('1.1.1.1'), false);
+      const dispose = hub.addClient(asResponse(res), 'client-a');
+      assert.equal(hub.isFullForIp('client-a'), false);
       dispose();
       assert.equal(hub.clientCount, 0);
       assert.equal(res.writableEnded, true);
@@ -100,7 +100,7 @@ describe('SseHub', () => {
   it('close ends every client connection', () => {
     const hub = new SseHub(NO_HEARTBEAT, 10, 3);
     const res = new FakeResponse();
-    hub.addClient(asResponse(res), '1.1.1.1');
+    hub.addClient(asResponse(res), 'client-a');
     hub.close();
     assert.equal(hub.clientCount, 0);
     assert.equal(res.writableEnded, true);

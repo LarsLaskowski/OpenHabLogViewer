@@ -64,7 +64,7 @@ async function startApp(opts: {
   const { port } = server.address() as AddressInfo;
 
   return {
-    base: `http://127.0.0.1:${port}`,
+    base: `http://localhost:${port}`,
     buffer,
     sseHub,
     close: async () => {
