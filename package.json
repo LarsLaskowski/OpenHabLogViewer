@@ -10,7 +10,9 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && node scripts/build.mjs",
-    "start": "node dist/server/index.cjs"
+    "start": "node dist/server/index.cjs",
+    "test": "node --import tsx --test src/server/*.test.ts src/client/*.test.ts",
+    "test:coverage": "node --import tsx --test --experimental-test-coverage src/server/*.test.ts src/client/*.test.ts"
   },
   "dependencies": {
     "express": "^5.1.0",
@@ -21,6 +23,7 @@
     "@types/express-rate-limit": "^6.0.2",
     "@types/node": "^25.9.3",
     "esbuild": "^0.28.1",
+    "tsx": "^4.22.4",
     "typescript": "^6.0.3"
   }
 }
