@@ -27,7 +27,7 @@ await build({
 });
 
 await build({
-  entryPoints: [path.join(rootDir, 'src', 'client', 'main.ts')],
+  entryPoints: [path.join(rootDir, 'src', 'client', 'entry.ts')],
   outfile: path.join(clientDistDir, 'main.js'),
   bundle: true,
   platform: 'browser',

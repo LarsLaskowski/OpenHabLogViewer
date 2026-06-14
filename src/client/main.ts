@@ -1,31 +1,26 @@
-import {
-  applyPreparedLogFilters,
-  createPreparedLogFilterKey,
-  matchesPreparedLogFilters,
-  prepareLogFilters
-} from './filters.js';
 import { createClientPerformanceMonitor } from './performance.js';
 import { renderConnectionStatus, renderLogLines, renderSourceStatuses } from './render.js';
+import { DerivedLogView } from './derivedLogView.js';
+import {
+  loadStoredPreferences,
+  parseLogOrder,
+  parseTheme,
+  persistStoredPreferences,
+  StoredUiPreferences
+} from './preferences.js';
 import {
   BootstrapResponse,
   getEffectiveClientMaxRenderedLines,
-  ClientState,
-  FiltersState,
   LogLine,
-  LogOrder,
   ResyncResponse,
   SourceStatus,
   SyncCursor,
   Theme,
   createInitialState
 } from './state.js';
-import type { PreparedLogFilters } from './filters.js';
 import type { CompleteClientTiming, PerformanceMetricDetails } from './performance.js';
 
 const state = createInitialState();
-const UI_PREFERENCES_STORAGE_KEY = 'openhab-log-viewer.ui-preferences';
-const THEME_STORAGE_KEY = 'openhab-log-viewer.theme';
-const LOG_ORDER_STORAGE_KEY = 'openhab-log-viewer.log-order';
 const SEARCH_INPUT_DEBOUNCE_MS = 150;
 const UI_PREFERENCES_PERSIST_DEBOUNCE_MS = 250;
 const VISIBILITY_RESYNC_IDLE_THRESHOLD_MS = 30_000;
@@ -90,17 +85,21 @@ const syncState: ClientSyncState = {
   queuedLiveLines: [],
   resyncPromise: null
 };
-const derivedLogView: DerivedLogViewState = createDerivedLogViewState();
+const derivedLogView = new DerivedLogView(state.filters);
 
-bindVisibilityInstrumentation();
-bindLifecycleHandlers();
-void bootstrap();
+// Start the app. Kept out of module scope so importing main.ts (e.g. from tests)
+// has no bootstrap/SSE side effects; the browser entry point calls this.
+export function init(): void {
+  bindVisibilityInstrumentation();
+  bindLifecycleHandlers();
+  void bootstrap();
+}
 
 async function bootstrap(): Promise<void> {
   const completeBootstrapTiming = performanceMonitor.startTiming('bootstrap', 'bootstrap-total');
   const completePreferencesTiming = performanceMonitor.startTiming('bootstrap', 'apply-preferences');
-  applyStoredPreferences(loadStoredPreferences());
-  syncDerivedLogFiltersWithState();
+  applyStoredPreferences(loadStoredPreferences(localStorage));
+  derivedLogView.setFilters(state.filters);
   applyTheme(state.theme);
   syncControlsFromState();
   renderConnectionStatus(connectionStatusElement, state.connectionState);
@@ -207,7 +206,7 @@ function bindControls(): void {
     performanceMonitor.recordEvent('filter', 'source-change', {
       source: state.filters.source
     });
-    if (syncDerivedLogFiltersWithState()) {
+    if (derivedLogView.setFilters(state.filters)) {
       renderAllImmediate('source-filter-change');
     }
   });
@@ -218,7 +217,7 @@ function bindControls(): void {
     performanceMonitor.recordEvent('filter', 'level-change', {
       level: state.filters.level
     });
-    if (syncDerivedLogFiltersWithState()) {
+    if (derivedLogView.setFilters(state.filters)) {
       renderAllImmediate('level-filter-change');
     }
   });
@@ -237,7 +236,7 @@ function bindControls(): void {
 
   orderSelectElement.addEventListener('change', () => {
     state.logOrder = parseLogOrder(orderSelectElement.value);
-    markDerivedLogOrderDirty();
+    derivedLogView.markOrderDirty();
     schedulePreferencesPersist();
     performanceMonitor.recordEvent('render', 'log-order-change', {
       logOrder: state.logOrder
@@ -279,7 +278,7 @@ function bindControls(): void {
     syncState.queuedLiveLines = [];
     resetHiddenTabState();
     state.lines = [];
-    resetDerivedLogView();
+    derivedLogView.reset();
     performanceMonitor.recordEvent('render', 'clear-buffer');
     renderAllImmediate('clear-buffer');
   });
@@ -568,7 +567,7 @@ function scheduleSearchInputRender(): void {
 
   searchInputDebounceHandle = globalThis.setTimeout(() => {
     searchInputDebounceHandle = null;
-    const filterKeyChanged = syncDerivedLogFiltersWithState();
+    const filterKeyChanged = derivedLogView.setFilters(state.filters);
     performanceMonitor.recordEvent('filter', 'text-change', {
       debounced: true,
       filterKeyChanged,
@@ -601,17 +600,16 @@ function schedulePreferencesPersist(): void {
 }
 
 function persistPreferencesNow(): void {
-  const preferences: StoredUiPreferences = {
-    filters: state.filters,
-    theme: state.theme,
-    logOrder: state.logOrder,
-    autoScroll: state.autoScroll,
-    paused: state.paused
-  };
-
-  localStorage.setItem(UI_PREFERENCES_STORAGE_KEY, JSON.stringify(preferences));
-  localStorage.setItem(THEME_STORAGE_KEY, state.theme);
-  localStorage.setItem(LOG_ORDER_STORAGE_KEY, state.logOrder);
+  persistStoredPreferences(
+    {
+      filters: state.filters,
+      theme: state.theme,
+      logOrder: state.logOrder,
+      autoScroll: state.autoScroll,
+      paused: state.paused
+    },
+    localStorage
+  );
 }
 
 function flushPendingPreferencePersistence(): void {
@@ -624,99 +622,10 @@ function flushPendingPreferencePersistence(): void {
   persistPreferencesNow();
 }
 
-function loadStoredPreferences(): StoredUiPreferences {
-  const storedValue = localStorage.getItem(UI_PREFERENCES_STORAGE_KEY);
-  const parsedValue = parseStoredPreferences(storedValue);
-
-  return {
-    filters: parsedValue?.filters ?? createInitialState().filters,
-    theme: parsedValue?.theme ?? loadStoredTheme(),
-    logOrder: parsedValue?.logOrder ?? loadStoredLogOrder(),
-    autoScroll: parsedValue?.autoScroll ?? true,
-    paused: parsedValue?.paused ?? false
-  };
-}
-
-function parseStoredPreferences(value: string | null): Partial<StoredUiPreferences> | null {
-  if (!value) {
-    return null;
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(value);
-  } catch {
-    console.warn('Ignoring invalid stored UI preferences.');
-    return null;
-  }
-
-  if (!parsed || typeof parsed !== 'object') {
-    return null;
-  }
-
-  const candidate = parsed as Record<string, unknown>;
-
-  return {
-    filters: parseStoredFilters(candidate.filters),
-    theme: parseOptionalTheme(candidate.theme),
-    logOrder: parseOptionalLogOrder(candidate.logOrder),
-    autoScroll: typeof candidate.autoScroll === 'boolean' ? candidate.autoScroll : undefined,
-    paused: typeof candidate.paused === 'boolean' ? candidate.paused : undefined
-  };
-}
-
-function parseStoredFilters(value: unknown): FiltersState | undefined {
-  if (!value || typeof value !== 'object') {
-    return undefined;
-  }
-
-  const candidate = value as Record<string, unknown>;
-  return {
-    source: parseSourceFilter(candidate.source),
-    level: parseLevelFilter(candidate.level),
-    query: typeof candidate.query === 'string' ? candidate.query : '',
-    hideSourceInMessage: typeof candidate.hideSourceInMessage === 'boolean' ? candidate.hideSourceInMessage : true
-  };
-}
-
-function parseSourceFilter(value: unknown): FiltersState['source'] {
-  return value === 'events' || value === 'openhab' ? value : 'all';
-}
-
-function parseLevelFilter(value: unknown): FiltersState['level'] {
-  return value === 'TRACE' || value === 'DEBUG' || value === 'INFO' || value === 'WARN' || value === 'ERROR'
-    ? value
-    : 'all';
-}
-
-function loadStoredTheme(): Theme {
-  return parseTheme(localStorage.getItem(THEME_STORAGE_KEY));
-}
-
-function parseOptionalTheme(value: unknown): Theme | undefined {
-  return value === 'light' || value === 'dark' ? value : undefined;
-}
-
-function parseTheme(value: unknown): Theme {
-  return value === 'dark' ? 'dark' : 'light';
-}
-
 function applyTheme(theme: Theme): void {
   document.documentElement.dataset.theme = theme;
   faviconElement.href = theme === 'dark' ? './assets/openHAB_darkBG_appicon.svg' : './assets/openHAB_appicon.svg';
   brandImageElement.src = theme === 'dark' ? './assets/openHAB_workswith_darkBG.svg' : './assets/openHAB_workswith.svg';
-}
-
-function loadStoredLogOrder(): LogOrder {
-  return parseLogOrder(localStorage.getItem(LOG_ORDER_STORAGE_KEY));
-}
-
-function parseOptionalLogOrder(value: unknown): LogOrder | undefined {
-  return value === 'newest-first' || value === 'oldest-first' ? value : undefined;
-}
-
-function parseLogOrder(value: unknown): LogOrder {
-  return value === 'oldest-first' ? 'oldest-first' : 'newest-first';
 }
 
 function renderCurrentLogLines(renderReason: string): number {
@@ -740,69 +649,23 @@ function renderCurrentLogLines(renderReason: string): number {
 }
 
 function getDisplayLines(reason: string): LogLine[] {
-  let filterCacheState: string;
-  if (derivedLogView.filteredDirty) {
-    filterCacheState = 'recompute-filters';
-  } else if (derivedLogView.displayDirty) {
-    filterCacheState = 'recompute-order';
-  } else {
-    filterCacheState = 'hit';
-  }
+  const filterCacheState = derivedLogView.cacheState();
   const completeFilterTiming = performanceMonitor.startTiming('filter', 'get-display-lines', {
     filterCacheState,
     levelFilter: state.filters.level,
     logOrder: state.logOrder,
-    queryLength: derivedLogView.preparedFilters.query.length,
+    queryLength: derivedLogView.queryLength,
     reason,
     sourceFilter: state.filters.source,
     totalLines: state.lines.length
   });
 
-  if (derivedLogView.filteredDirty) {
-    derivedLogView.filteredLines = applyPreparedLogFilters(state.lines, derivedLogView.preparedFilters);
-    derivedLogView.filteredLineIds = new Set(derivedLogView.filteredLines.map((line) => line.id));
-    derivedLogView.filteredDirty = false;
-    derivedLogView.displayDirty = true;
-  }
-
-  if (derivedLogView.displayDirty) {
-    derivedLogView.displayLines =
-      state.logOrder === 'newest-first' ? [...derivedLogView.filteredLines].reverse() : derivedLogView.filteredLines;
-    derivedLogView.displayDirty = false;
-  }
-
-  const displayLines = derivedLogView.displayLines;
+  const displayLines = derivedLogView.getDisplayLines(state.lines, state.logOrder);
   completeFilterTiming({
     displayedLines: displayLines.length,
     filterCacheState
   });
   return displayLines;
-}
-
-function syncDerivedLogFiltersWithState(): boolean {
-  const preparedFilters = prepareLogFilters(state.filters);
-  const filterKey = createPreparedLogFilterKey(preparedFilters);
-  if (filterKey === derivedLogView.filterKey) {
-    return false;
-  }
-
-  derivedLogView.preparedFilters = preparedFilters;
-  derivedLogView.filterKey = filterKey;
-  derivedLogView.filteredDirty = true;
-  derivedLogView.displayDirty = true;
-  return true;
-}
-
-function markDerivedLogOrderDirty(): void {
-  derivedLogView.displayDirty = true;
-}
-
-function resetDerivedLogView(): void {
-  derivedLogView.filteredLines = [];
-  derivedLogView.filteredLineIds.clear();
-  derivedLogView.displayLines = [];
-  derivedLogView.filteredDirty = true;
-  derivedLogView.displayDirty = true;
 }
 
 function getEffectiveClientLimit(limit: number = state.clientMaxRenderedLines): number {
@@ -816,7 +679,7 @@ function getEffectiveClientLimit(limit: number = state.clientMaxRenderedLines): 
 
 function replaceBufferedLines(lines: LogLine[], preservedLines: LogLine[] = []): void {
   state.lines = [...lines, ...preservedLines].slice(-getEffectiveClientLimit());
-  resetDerivedLogView();
+  derivedLogView.reset();
 }
 
 function appendBufferedLine(line: LogLine): boolean {
@@ -833,7 +696,7 @@ function appendBufferedLine(line: LogLine): boolean {
     removedLines = state.lines.splice(0, state.lines.length - effectiveClientLimit);
   }
 
-  updateDerivedLogViewForBufferedLines([line], removedLines);
+  derivedLogView.applyBufferedDelta([line], removedLines, state.logOrder);
   return true;
 }
 
@@ -845,50 +708,6 @@ function queueLiveLineDuringResync(line: LogLine): boolean {
 
   syncState.queuedLiveLines.push(line);
   return true;
-}
-
-function updateDerivedLogViewForBufferedLines(appendedLines: LogLine[], removedLines: LogLine[]): void {
-  if (derivedLogView.filteredDirty || derivedLogView.displayDirty) {
-    return;
-  }
-
-  let removedFilteredCount = 0;
-  for (const removedLine of removedLines) {
-    if (derivedLogView.filteredLineIds.delete(removedLine.id)) {
-      removedFilteredCount += 1;
-    }
-  }
-
-  if (removedFilteredCount > 0) {
-    derivedLogView.filteredLines.splice(0, removedFilteredCount);
-    if (state.logOrder === 'newest-first') {
-      derivedLogView.displayLines.splice(Math.max(derivedLogView.displayLines.length - removedFilteredCount, 0), removedFilteredCount);
-    }
-  }
-
-  const appendedFilteredLines: LogLine[] = [];
-  for (const appendedLine of appendedLines) {
-    if (!matchesPreparedLogFilters(appendedLine, derivedLogView.preparedFilters)) {
-      continue;
-    }
-
-    derivedLogView.filteredLines.push(appendedLine);
-    derivedLogView.filteredLineIds.add(appendedLine.id);
-    appendedFilteredLines.push(appendedLine);
-  }
-
-  if (appendedFilteredLines.length === 0 || derivedLogView.displayLines === derivedLogView.filteredLines) {
-    return;
-  }
-
-  if (state.logOrder === 'newest-first') {
-    for (let index = appendedFilteredLines.length - 1; index >= 0; index -= 1) {
-      derivedLogView.displayLines.unshift(appendedFilteredLines[index]);
-    }
-    return;
-  }
-
-  derivedLogView.displayLines.push(...appendedFilteredLines);
 }
 
 function scheduleLiveRender(update: { logLines?: number; sourceStatuses?: number }): void {
@@ -1429,14 +1248,6 @@ function consumeVisibleResumeConnection(details: PerformanceMetricDetails = {}):
   pendingVisibleConnectionSinceMs = null;
 }
 
-interface StoredUiPreferences {
-  filters: FiltersState;
-  theme: Theme;
-  logOrder: LogOrder;
-  autoScroll: ClientState['autoScroll'];
-  paused: ClientState['paused'];
-}
-
 interface PendingLiveRenderState {
   frameId: ReturnType<typeof globalThis.requestAnimationFrame> | null;
   logLines: boolean;
@@ -1471,28 +1282,4 @@ interface HiddenTabState {
   pendingResync: boolean;
   queuedLiveLines: LogLine[];
   sourceStatusesDirty: boolean;
-}
-
-interface DerivedLogViewState {
-  preparedFilters: PreparedLogFilters;
-  filterKey: string;
-  filteredLines: LogLine[];
-  filteredLineIds: Set<number>;
-  displayLines: LogLine[];
-  filteredDirty: boolean;
-  displayDirty: boolean;
-}
-
-function createDerivedLogViewState(): DerivedLogViewState {
-  const preparedFilters = prepareLogFilters(state.filters);
-
-  return {
-    preparedFilters,
-    filterKey: createPreparedLogFilterKey(preparedFilters),
-    filteredLines: [],
-    filteredLineIds: new Set<number>(),
-    displayLines: [],
-    filteredDirty: true,
-    displayDirty: true
-  };
 }
