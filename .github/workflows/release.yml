@@ -99,7 +99,7 @@ jobs:
           mkdir -p "release/${PKG_NAME}"
           cp -r dist "release/${PKG_NAME}/dist"
           cp -r deploy "release/${PKG_NAME}/deploy"
-          cp package.json README.md "release/${PKG_NAME}/"
+          cp "${GITHUB_WORKSPACE}/package.json" README.md "release/${PKG_NAME}/"
           tar -czf "${PKG_NAME}.tar.gz" -C release "${PKG_NAME}"
           (cd release && zip -r "../${PKG_NAME}.zip" "${PKG_NAME}")
 

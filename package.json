@@ -1,11 +1,11 @@
 {
   "name": "openhab-log-viewer",
-  "version": "2.1.7",
+  "version": "2.2.1",
   "private": true,
   "type": "module",
   "description": "Live web viewer for openHAB events.log and openhab.log",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
