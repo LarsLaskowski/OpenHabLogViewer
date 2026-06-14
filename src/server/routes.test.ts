@@ -57,6 +57,7 @@ async function startApp(opts: {
   const sseHub = opts.sseHub ?? new SseHub(NO_HEARTBEAT, 10, 3);
   const config = baseConfig(opts.config);
   const app = express();
+  app.disable('x-powered-by'); // mirror production hardening (no framework fingerprinting)
   app.use('/api', createApiRouter({ config, buffer, sseHub, getStatuses: () => opts.statuses ?? [] }));
 
   const server: Server = app.listen(0);
