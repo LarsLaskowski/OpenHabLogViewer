@@ -65,6 +65,30 @@ describe('LogBuffer', () => {
     assert.deepEqual(buffer.getItemsAfterId(0).map((line) => line.id), [1, 2, 3, 4, 5]);
   });
 
+  it('keeps the logical order and ids correct after wrapping around capacity', () => {
+    const buffer = new LogBuffer(3);
+    for (let i = 0; i < 10; i += 1) {
+      buffer.push(draft({ message: `m${i}` }));
+    }
+
+    assert.deepEqual(buffer.getItems().map((line) => line.id), [8, 9, 10]);
+    assert.deepEqual(buffer.getItems(2).map((line) => line.id), [9, 10]);
+    assert.deepEqual(buffer.getRange(), { oldestId: 8, newestId: 10, totalLines: 3 });
+  });
+
+  it('getItemsAfterId honors eviction once the buffer has wrapped', () => {
+    const buffer = new LogBuffer(3);
+    for (let i = 0; i < 6; i += 1) {
+      buffer.push(draft());
+    }
+
+    // Only ids 4..6 remain buffered after eviction.
+    assert.deepEqual(buffer.getItemsAfterId(4).map((line) => line.id), [5, 6]);
+    assert.deepEqual(buffer.getItemsAfterId(6), []);
+    // A cursor older than everything buffered returns all current lines.
+    assert.deepEqual(buffer.getItemsAfterId(0).map((line) => line.id), [4, 5, 6]);
+  });
+
   it('returns copies so callers cannot mutate the internal store', () => {
     const buffer = new LogBuffer(10);
     buffer.push(draft());
