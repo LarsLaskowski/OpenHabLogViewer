@@ -52,6 +52,23 @@ interface RenderedView {
 
 const renderedViews = new WeakMap<HTMLElement, RenderedView>();
 
+// Captured scroll metrics from before the DOM mutation, plus the intent for the
+// deferred scroll-position write. Reading `scrollHeight`/`clientHeight` right
+// after mutating the DOM forces a synchronous reflow, so we batch all reads
+// before the mutation and defer the post-mutation read + scrollTop write into a
+// `requestAnimationFrame` callback (see issue #45).
+interface PendingScroll {
+  documentScroller: Element;
+  autoScroll: boolean;
+  logOrder: LogOrder;
+  previousScrollTop: number;
+  previousScrollHeight: number;
+  previousDocumentScrollTop: number;
+  previousDocumentScrollHeight: number;
+}
+
+const pendingScrolls = new WeakMap<HTMLElement, PendingScroll>();
+
 export function renderLogLines(target: HTMLElement, lines: LogLine[], autoScroll: boolean, logOrder: LogOrder, hideSourceInMessage = false): void {
   const documentScroller = target.ownerDocument.scrollingElement ?? target.ownerDocument.documentElement;
   const previousScrollTop = target.scrollTop;
@@ -88,6 +105,51 @@ export function renderLogLines(target: HTMLElement, lines: LogLine[], autoScroll
     renderedViews.set(target, { ids: desiredIds, nodes: nextNodes, hideSourceInMessage });
   }
 
+  scheduleScrollAdjustment(target, {
+    documentScroller,
+    autoScroll,
+    logOrder,
+    previousScrollTop,
+    previousScrollHeight,
+    previousDocumentScrollTop,
+    previousDocumentScrollHeight
+  });
+}
+
+// Defer the post-mutation scroll read + write to the next animation frame so it
+// rides the browser's natural layout pass instead of forcing an extra reflow.
+// When several renders land within one frame they coalesce: the earliest scroll
+// metrics (the last painted state) are preserved while the most recent
+// autoScroll/order intent wins, and the single pending write applies once.
+function scheduleScrollAdjustment(target: HTMLElement, pending: PendingScroll): void {
+  const existing = pendingScrolls.get(target);
+  if (existing) {
+    existing.autoScroll = pending.autoScroll;
+    existing.logOrder = pending.logOrder;
+    return;
+  }
+
+  const view = target.ownerDocument.defaultView;
+  if (!view || typeof view.requestAnimationFrame !== 'function') {
+    // No animation-frame scheduling available (e.g. jsdom): fall back to a
+    // synchronous adjustment so behavior is preserved.
+    applyScrollAdjustment(target, pending);
+    return;
+  }
+
+  pendingScrolls.set(target, pending);
+  view.requestAnimationFrame(() => {
+    const current = pendingScrolls.get(target);
+    pendingScrolls.delete(target);
+    if (current) {
+      applyScrollAdjustment(target, current);
+    }
+  });
+}
+
+function applyScrollAdjustment(target: HTMLElement, pending: PendingScroll): void {
+  const { documentScroller, autoScroll, logOrder } = pending;
+
   // The container only scrolls itself when its content overflows a constrained
   // height; otherwise it grows with its content and the page is the scroller.
   const containerScrolls = target.scrollHeight > target.clientHeight;
@@ -95,9 +157,9 @@ export function renderLogLines(target: HTMLElement, lines: LogLine[], autoScroll
     if (autoScroll) {
       target.scrollTop = logOrder === 'newest-first' ? 0 : target.scrollHeight;
     } else if (logOrder === 'newest-first') {
-      target.scrollTop = previousScrollTop + (target.scrollHeight - previousScrollHeight);
+      target.scrollTop = pending.previousScrollTop + (target.scrollHeight - pending.previousScrollHeight);
     } else {
-      target.scrollTop = previousScrollTop;
+      target.scrollTop = pending.previousScrollTop;
     }
     return;
   }
@@ -105,9 +167,9 @@ export function renderLogLines(target: HTMLElement, lines: LogLine[], autoScroll
   if (autoScroll) {
     documentScroller.scrollTop = logOrder === 'newest-first' ? 0 : documentScroller.scrollHeight;
   } else if (logOrder === 'newest-first') {
-    documentScroller.scrollTop = previousDocumentScrollTop + (documentScroller.scrollHeight - previousDocumentScrollHeight);
+    documentScroller.scrollTop = pending.previousDocumentScrollTop + (documentScroller.scrollHeight - pending.previousDocumentScrollHeight);
   } else {
-    documentScroller.scrollTop = previousDocumentScrollTop;
+    documentScroller.scrollTop = pending.previousDocumentScrollTop;
   }
 }
 
