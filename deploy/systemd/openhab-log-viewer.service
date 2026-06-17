@@ -11,7 +11,7 @@ Environment=EVENTS_LOG_PATH=/var/log/openhab/events.log
 Environment=OPENHAB_LOG_PATH=/var/log/openhab/openhab.log
 Environment=INITIAL_LINES_PER_FILE=500
 Environment=MAX_BUFFERED_LINES=10000
-Environment=CLIENT_MAX_RENDERED_LINES=1500
+Environment=CLIENT_MAX_RENDERED_LINES=500
 # Uncomment when running behind a reverse proxy (value = number of proxy hops):
 # Environment=TRUST_PROXY=1
 EnvironmentFile=-/etc/default/openhab-log-viewer

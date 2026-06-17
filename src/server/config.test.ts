@@ -67,6 +67,11 @@ describe('loadConfig integer clamping', () => {
     assert.equal(loadConfig().port, 65535);
   });
 
+  it('clamps CLIENT_MAX_RENDERED_LINES to the 500 browser ceiling', () => {
+    process.env.CLIENT_MAX_RENDERED_LINES = '1500';
+    assert.equal(loadConfig().clientMaxRenderedLines, 500);
+  });
+
   it('falls back to the default for non-numeric values', () => {
     process.env.INITIAL_LINES_PER_FILE = 'abc';
     assert.equal(loadConfig().initialLinesPerFile, 500);
