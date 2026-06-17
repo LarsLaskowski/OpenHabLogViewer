@@ -80,7 +80,10 @@ export function loadConfig(): AppConfig {
     port: clampInteger('PORT', 9001, 1, 65_535),
     initialLinesPerFile: clampInteger('INITIAL_LINES_PER_FILE', 500, 1, 100_000),
     maxBufferedLines: clampInteger('MAX_BUFFERED_LINES', 2_000, 100, 1_000_000),
-    clientMaxRenderedLines: clampInteger('CLIENT_MAX_RENDERED_LINES', 500, 100, 100_000),
+    // The browser hard-caps rendering at CLIENT_MAX_RENDERED_LINES_CAP (500) for
+    // responsiveness, so clamping the server-advertised value to the same ceiling
+    // keeps config, server and client consistent (see issue #88).
+    clientMaxRenderedLines: clampInteger('CLIENT_MAX_RENDERED_LINES', 500, 100, 500),
     maxSseClients: clampInteger('MAX_SSE_CLIENTS', 10, 1, 1_000),
     maxSseClientsPerIp: clampInteger('MAX_SSE_CLIENTS_PER_IP', 3, 1, 1_000),
     trustProxy: parseTrustProxy('TRUST_PROXY'),
