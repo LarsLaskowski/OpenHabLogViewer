@@ -86,3 +86,30 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  # Single stable status check to mark as "required" in branch protection.
+  # It depends on every other job, so branch protection never has to track the
+  # individual matrix checks (e.g. "Type-check & build (24)"), whose names
+  # change whenever the Node.js matrix changes. This avoids stale required
+  # checks blocking merges after a matrix update.
+  ci-success:
+    name: CI success
+    runs-on: ubuntu-latest
+    if: ${{ always() }}
+    needs: [build, audit, sonarqube]
+    steps:
+      - name: Verify all required jobs succeeded
+        env:
+          # 'skipped' is allowed so the sonarqube job (skipped for Dependabot)
+          # does not fail the gate; 'success' covers the normal case.
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          set -euo pipefail
+          echo "Dependency job results: $RESULTS"
+          for result in $RESULTS; do
+            if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
+              echo "::error::A required CI job did not succeed (result: $result)."
+              exit 1
+            fi
+          done
+          echo "All required CI jobs succeeded."
