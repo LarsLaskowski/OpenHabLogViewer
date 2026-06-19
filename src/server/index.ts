@@ -7,6 +7,7 @@ import { LogLineDraft, SourceStatus } from './types.js';
 import { LogLineParser } from './logLineParser.js';
 import { LogTailer } from './logTailer.js';
 import { createApiRouter } from './routes.js';
+import { createShutdown } from './shutdown.js';
 import { SseHub } from './sseHub.js';
 
 async function main(): Promise<void> {
@@ -86,15 +87,7 @@ async function main(): Promise<void> {
     console.log(`OpenHab Log Viewer listening on port ${config.port}`);
   });
 
-  const shutdown = async (): Promise<void> => {
-    for (const tailer of tailers) {
-      await tailer.stop();
-    }
-    sseHub.close();
-    server.close(() => {
-      process.exit(0);
-    });
-  };
+  const shutdown = createShutdown({ tailers, sseHub, server });
 
   process.on('SIGINT', () => void shutdown());
   process.on('SIGTERM', () => void shutdown());
@@ -126,6 +119,10 @@ function securityHeaders(_request: express.Request, response: express.Response, 
   next();
 }
 
+// Initial sort is by timestamp only, so lines from different sources that share
+// the same millisecond can interleave. This means a multi-line group from one
+// source can be split by a line from the other source during the one-time
+// bootstrap seed; live tailing preserves per-source order afterwards.
 function compareInitialLines(left: LogLineDraft, right: LogLineDraft): number {
   if (left.timestamp && right.timestamp) {
     return left.timestamp.localeCompare(right.timestamp);

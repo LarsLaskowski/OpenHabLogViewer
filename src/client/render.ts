@@ -214,7 +214,6 @@ function createLogLineElement(line: LogLine, hideSourceInMessage?: boolean): HTM
   const row = document.createElement('article');
   row.className = [
     'log-line',
-    `source-${line.source}`,
     line.level ? `level-${line.level.toLowerCase()}` : 'level-none',
     line.isContinuation ? 'continuation' : 'head-line'
   ].join(' ');
@@ -372,7 +371,6 @@ function looksLikeTypeName(value: string): boolean {
 }
 
 const LOGGER_LABELS: Record<string, string> = {
-  'ty.util.ssl.SslContextFactory.config': 'SSL-Config',
   ChannelTriggeredEvent: 'Channel triggered',
   InboxRemovedEvent: 'Inbox entry removed',
   ItemCommandEvent: 'Item command',

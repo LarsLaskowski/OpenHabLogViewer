@@ -117,7 +117,6 @@ describe('createLogLineElement (via renderLogLines)', () => {
 
     const head = container.children[0];
     assert.ok(head.classList.contains('head-line'));
-    assert.ok(head.classList.contains('source-events'));
     assert.ok(head.classList.contains('level-info'));
     assert.equal(head.querySelector('.source-badge')?.textContent, 'events.log');
     assert.equal(head.querySelector('.level-badge')?.textContent, 'INFO');

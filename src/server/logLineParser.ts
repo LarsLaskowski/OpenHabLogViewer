@@ -1,4 +1,4 @@
-import { LogLevel, LogLineDraft, LogSource, LOG_LEVELS, SourceConfig } from './types.js';
+import { LogLevel, LogLineDraft, LogSource, SourceConfig } from './types.js';
 
 const HEADER_PATTERN =
   /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) \[(TRACE|DEBUG|INFO|WARN|ERROR)\s*\] \[([^\]]+)\] - ?(.*)$/;
@@ -10,8 +10,7 @@ export class LogLineParser {
   private readonly nextGroupBySource = new Map<LogSource, number>();
 
   parse(sourceConfig: SourceConfig, rawLine: string, receivedAt = new Date().toISOString()): LogLineDraft {
-    const normalizedLine = rawLine;
-    const headerMatch = HEADER_PATTERN.exec(normalizedLine);
+    const headerMatch = HEADER_PATTERN.exec(rawLine);
 
     if (headerMatch) {
       const timestamp = parseLocalTimestamp(headerMatch[1]);
@@ -27,7 +26,7 @@ export class LogLineParser {
         return {
           source: sourceConfig.source,
           fileName: sourceConfig.fileName,
-          rawLine: normalizedLine,
+          rawLine,
           receivedAt,
           isTimestamped: true,
           timestamp,
@@ -40,19 +39,19 @@ export class LogLineParser {
       }
     }
 
-    const isContinuation = !TIMESTAMP_PREFIX_PATTERN.test(normalizedLine);
+    const isContinuation = !TIMESTAMP_PREFIX_PATTERN.test(rawLine);
     const lastHeader = this.lastHeaderBySource.get(sourceConfig.source);
 
     return {
       source: sourceConfig.source,
       fileName: sourceConfig.fileName,
-      rawLine: normalizedLine,
+      rawLine,
       receivedAt,
       isTimestamped: false,
       timestamp: isContinuation ? lastHeader?.timestamp ?? null : null,
       level: isContinuation ? lastHeader?.level ?? null : null,
       logger: isContinuation ? lastHeader?.logger ?? null : null,
-      message: normalizedLine,
+      message: rawLine,
       isContinuation,
       groupId: isContinuation ? lastHeader?.groupId ?? this.lastGroupIdBySource.get(sourceConfig.source) ?? null : null
     };
@@ -79,6 +78,10 @@ interface HeaderContext {
   groupId: string;
 }
 
+// openHAB writes log timestamps in the host's local time without a zone offset,
+// so we interpret the parsed fields as local time (via the multi-argument Date
+// constructor) and normalize to an ISO/UTC string. This assumes the viewer runs
+// in the same timezone as the openHAB instance that produced the logs.
 function parseLocalTimestamp(input: string): string | null {
   const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})\.(\d{3})$/.exec(input);
   if (!match) {
@@ -97,8 +100,4 @@ function parseLocalTimestamp(input: string): string | null {
   );
 
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-export function isKnownLogLevel(value: string | null): value is (typeof LOG_LEVELS)[number] {
-  return value !== null && LOG_LEVELS.includes(value as (typeof LOG_LEVELS)[number]);
 }
