@@ -232,11 +232,12 @@ function createLogLineElement(line: LogLine, hideSourceInMessage?: boolean): HTM
     const timestampTooltip = line.timestamp ? formatTimestampTooltip(line.timestamp) : undefined;
     const loggerLabel = formatLoggerLabel(line.logger);
     const loggerTooltip = line.logger && loggerLabel !== line.logger ? line.logger : undefined;
+    const levelModifier = line.level ? `level-${line.level.toLowerCase()}` : 'level-none';
 
     row.append(
       createCell('time-cell', timestampLabel, timestampTooltip),
       createBadgeCell('source-cell', line.fileName, `source-badge source-${line.source}`),
-      createBadgeCell('level-cell', line.level ?? '—', `level-badge ${line.level ? `level-${line.level.toLowerCase()}` : 'level-none'}`),
+      createBadgeCell('level-cell', line.level ?? '—', `level-badge ${levelModifier}`),
       createCell('logger-cell', loggerLabel, loggerTooltip),
       createMessageCell(line, hideSourceInMessage)
     );

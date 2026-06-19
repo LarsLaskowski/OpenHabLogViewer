@@ -221,7 +221,7 @@ export class LogTailer {
   }
 
   private consumeChunk(chunk: string): string[] {
-    const normalized = `${this.pendingChunk}${chunk}`.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const normalized = `${this.pendingChunk}${chunk}`.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
     const parts = normalized.split('\n');
 
     if (normalized.endsWith('\n')) {
@@ -371,7 +371,7 @@ async function readLastLines(filePath: string, maxLines: number): Promise<TailRe
     }
 
     // Decode and normalize the collected tail exactly once, after the loop.
-    const normalizedText = Buffer.concat(chunks).toString('utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const normalizedText = Buffer.concat(chunks).toString('utf8').replaceAll('\r\n', '\n').replaceAll('\r', '\n');
     const parts = normalizedText.split('\n');
     if (normalizedText.endsWith('\n')) {
       parts.pop();
