@@ -18,6 +18,7 @@ function baseConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     clientMaxRenderedLines: 500,
     maxSseClients: 10,
     maxSseClientsPerIp: 3,
+    pollIntervalMs: 1000,
     trustProxy: false,
     sources: [],
     ...overrides

@@ -35,7 +35,8 @@ async function main(): Promise<void> {
         initialLinesPerFile: config.initialLinesPerFile,
         parser,
         onLines: pushLiveLines,
-        onStatus: updateStatus
+        onStatus: updateStatus,
+        pollIntervalMs: config.pollIntervalMs
       })
   );
 
