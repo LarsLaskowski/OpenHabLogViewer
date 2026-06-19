@@ -59,6 +59,12 @@ npm run start
 
 The application is then available at `http://localhost:9001`.
 
+Run the test suite (requires Node.js 22+):
+
+```bash
+npm test
+```
+
 ### Optional client performance instrumentation
 
 For development profiling, enable the browser-side instrumentation with `?perf=1` in the URL or by running `localStorage.setItem('openhab-log-viewer.perf', '1')` in the browser console and then reloading the page.
