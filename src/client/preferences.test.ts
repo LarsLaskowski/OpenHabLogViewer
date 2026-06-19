@@ -118,4 +118,38 @@ describe('persistStoredPreferences', () => {
     persistStoredPreferences(prefs, storage);
     assert.deepEqual(loadStoredPreferences(storage), prefs);
   });
+
+  it('caps an oversized stored query length', () => {
+    const storage = new FakeStorage();
+    const prefs: StoredUiPreferences = {
+      filters: { source: 'all', level: 'all', query: 'a'.repeat(5000), hideSourceInMessage: true },
+      theme: 'light',
+      logOrder: 'newest-first',
+      autoScroll: true,
+      paused: false
+    };
+    persistStoredPreferences(prefs, storage);
+
+    assert.equal(loadStoredPreferences(storage).filters.query.length, 1000);
+  });
+
+  it('swallows storage errors instead of throwing', () => {
+    const throwingStorage: PreferenceStorage = {
+      getItem(): string | null {
+        return null;
+      },
+      setItem(): void {
+        throw new Error('quota exceeded');
+      }
+    };
+    const prefs: StoredUiPreferences = {
+      filters: { source: 'all', level: 'all', query: '', hideSourceInMessage: true },
+      theme: 'light',
+      logOrder: 'newest-first',
+      autoScroll: true,
+      paused: false
+    };
+
+    assert.doesNotThrow(() => persistStoredPreferences(prefs, throwingStorage));
+  });
 });

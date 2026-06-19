@@ -19,6 +19,10 @@ const UI_PREFERENCES_STORAGE_KEY = 'openhab-log-viewer.ui-preferences';
 const THEME_STORAGE_KEY = 'openhab-log-viewer.theme';
 const LOG_ORDER_STORAGE_KEY = 'openhab-log-viewer.log-order';
 
+// Cap the persisted query so an extreme value cannot bloat localStorage or
+// risk hitting the storage quota on its own.
+const MAX_STORED_QUERY_LENGTH = 1000;
+
 export function loadStoredPreferences(storage: PreferenceStorage): StoredUiPreferences {
   const parsedValue = parseStoredPreferences(storage.getItem(UI_PREFERENCES_STORAGE_KEY));
 
@@ -32,9 +36,32 @@ export function loadStoredPreferences(storage: PreferenceStorage): StoredUiPrefe
 }
 
 export function persistStoredPreferences(preferences: StoredUiPreferences, storage: PreferenceStorage): void {
-  storage.setItem(UI_PREFERENCES_STORAGE_KEY, JSON.stringify(preferences));
-  storage.setItem(THEME_STORAGE_KEY, preferences.theme);
-  storage.setItem(LOG_ORDER_STORAGE_KEY, preferences.logOrder);
+  const cappedPreferences = capPreferencesQuery(preferences);
+
+  // localStorage.setItem can throw (private-browsing mode, exceeded quota).
+  // This runs from a debounce timer and the pagehide handler, so swallow the
+  // error to keep those flows from crashing; preferences just won't persist.
+  try {
+    storage.setItem(UI_PREFERENCES_STORAGE_KEY, JSON.stringify(cappedPreferences));
+    storage.setItem(THEME_STORAGE_KEY, cappedPreferences.theme);
+    storage.setItem(LOG_ORDER_STORAGE_KEY, cappedPreferences.logOrder);
+  } catch {
+    console.warn('Unable to persist UI preferences to storage.');
+  }
+}
+
+function capPreferencesQuery(preferences: StoredUiPreferences): StoredUiPreferences {
+  if (preferences.filters.query.length <= MAX_STORED_QUERY_LENGTH) {
+    return preferences;
+  }
+
+  return {
+    ...preferences,
+    filters: {
+      ...preferences.filters,
+      query: preferences.filters.query.slice(0, MAX_STORED_QUERY_LENGTH)
+    }
+  };
 }
 
 export function parseTheme(value: unknown): Theme {
