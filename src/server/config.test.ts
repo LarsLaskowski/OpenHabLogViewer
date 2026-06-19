@@ -53,8 +53,10 @@ describe('loadConfig defaults', () => {
     assert.equal(config.sources.length, 2);
     assert.equal(config.sources[0].source, 'events');
     assert.equal(config.sources[0].fileName, 'events.log');
-    assert.equal(config.sources[0].filePath, '/var/log/openhab/events.log');
-    assert.equal(config.sources[1].filePath, '/var/log/openhab/openhab.log');
+    // loadConfig runs the default paths through path.resolve, so compare against
+    // the same resolution to stay correct on both POSIX and Windows.
+    assert.equal(config.sources[0].filePath, path.resolve('/var/log/openhab/events.log'));
+    assert.equal(config.sources[1].filePath, path.resolve('/var/log/openhab/openhab.log'));
   });
 });
 
@@ -115,8 +117,8 @@ describe('loadConfig source resolution', () => {
   it('honors OPENHAB_LOG_DIR for both default file names', () => {
     process.env.OPENHAB_LOG_DIR = '/custom/logs';
     const config = loadConfig();
-    assert.equal(config.sources[0].filePath, '/custom/logs/events.log');
-    assert.equal(config.sources[1].filePath, '/custom/logs/openhab.log');
+    assert.equal(config.sources[0].filePath, path.resolve('/custom/logs', 'events.log'));
+    assert.equal(config.sources[1].filePath, path.resolve('/custom/logs', 'openhab.log'));
   });
 
   it('throws when a configured path exists but is not a regular file', () => {
