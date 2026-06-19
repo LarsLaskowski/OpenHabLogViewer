@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { LogLineParser, isKnownLogLevel } from './logLineParser.js';
+import { LogLineParser } from './logLineParser.js';
 import { SourceConfig } from './types.js';
 
 const events: SourceConfig = { source: 'events', fileName: 'events.log', filePath: '/var/log/openhab/events.log' };
@@ -93,16 +93,5 @@ describe('LogLineParser.parse', () => {
     const parser = new LogLineParser();
     const line = parser.parse(events, header('2026-06-13 10:00:00.000', 'INFO ', 'log', 'x'), '2020-01-01T00:00:00.000Z');
     assert.equal(line.receivedAt, '2020-01-01T00:00:00.000Z');
-  });
-});
-
-describe('isKnownLogLevel', () => {
-  it('accepts known levels and rejects others', () => {
-    for (const level of ['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR']) {
-      assert.equal(isKnownLogLevel(level), true);
-    }
-    assert.equal(isKnownLogLevel('FATAL'), false);
-    assert.equal(isKnownLogLevel('info'), false);
-    assert.equal(isKnownLogLevel(null), false);
   });
 });

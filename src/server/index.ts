@@ -87,11 +87,20 @@ async function main(): Promise<void> {
   });
 
   const shutdown = async (): Promise<void> => {
+    // Guarantee the process exits even if server.close() never fires its
+    // callback (e.g. a lingering keep-alive connection that never drains).
+    const forceExit = setTimeout(() => {
+      console.error('Shutdown timed out, forcing exit');
+      process.exit(1);
+    }, 10_000);
+    forceExit.unref();
+
     for (const tailer of tailers) {
       await tailer.stop();
     }
     sseHub.close();
     server.close(() => {
+      clearTimeout(forceExit);
       process.exit(0);
     });
   };
@@ -126,6 +135,10 @@ function securityHeaders(_request: express.Request, response: express.Response, 
   next();
 }
 
+// Initial sort is by timestamp only, so lines from different sources that share
+// the same millisecond can interleave. This means a multi-line group from one
+// source can be split by a line from the other source during the one-time
+// bootstrap seed; live tailing preserves per-source order afterwards.
 function compareInitialLines(left: LogLineDraft, right: LogLineDraft): number {
   if (left.timestamp && right.timestamp) {
     return left.timestamp.localeCompare(right.timestamp);

@@ -91,11 +91,18 @@
         <button id="clear-button" type="button">Clear browser buffer</button>
 
         <div class="controls-status" aria-label="Source status">
-          <div id="source-status-list" class="status-list"></div>
+          <div id="source-status-list" class="status-list" aria-live="polite"></div>
         </div>
       </section>
 
-      <main id="log-container" class="log-container" aria-live="polite"></main>
+      <!--
+        No aria-live here: the log stream appends rows continuously, and a live
+        region over the whole container floods screen readers with every new
+        line. The live region is scoped to the source status list instead, so
+        important state transitions (rotation, missing files, errors) stay
+        accessible without announcing every log line.
+      -->
+      <main id="log-container" class="log-container"></main>
     </div>
 
     <script type="module" src="./main.js"></script>
