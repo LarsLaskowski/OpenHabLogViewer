@@ -57,15 +57,22 @@ export class LogBuffer {
   }
 
   getItemsAfterId(afterId: number): LogLine[] {
-    const result: LogLine[] = [];
-    for (let i = 0; i < this.size; i += 1) {
-      const item = this.storage[(this.head + i) % this.maxBufferedLines];
-      if (item.id > afterId) {
-        for (let j = i; j < this.size; j += 1) {
-          result.push(this.storage[(this.head + j) % this.maxBufferedLines]);
-        }
-        break;
-      }
+    if (this.size === 0) {
+      return [];
+    }
+
+    // Ids are strictly monotonic and contiguous within the buffer, so the start
+    // offset can be computed directly instead of scanning (O(1) vs O(n)).
+    const oldestId = this.storage[this.head].id;
+    const start = Math.max(0, afterId - oldestId + 1);
+    if (start >= this.size) {
+      return [];
+    }
+
+    const count = this.size - start;
+    const result: LogLine[] = new Array(count);
+    for (let i = 0; i < count; i += 1) {
+      result[i] = this.storage[(this.head + start + i) % this.maxBufferedLines];
     }
     return result;
   }
