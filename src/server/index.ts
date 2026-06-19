@@ -7,6 +7,7 @@ import { LogLineDraft, SourceStatus } from './types.js';
 import { LogLineParser } from './logLineParser.js';
 import { LogTailer } from './logTailer.js';
 import { createApiRouter } from './routes.js';
+import { createShutdown } from './shutdown.js';
 import { SseHub } from './sseHub.js';
 
 async function main(): Promise<void> {
@@ -86,24 +87,7 @@ async function main(): Promise<void> {
     console.log(`OpenHab Log Viewer listening on port ${config.port}`);
   });
 
-  const shutdown = async (): Promise<void> => {
-    // Guarantee the process exits even if server.close() never fires its
-    // callback (e.g. a lingering keep-alive connection that never drains).
-    const forceExit = setTimeout(() => {
-      console.error('Shutdown timed out, forcing exit');
-      process.exit(1);
-    }, 10_000);
-    forceExit.unref();
-
-    for (const tailer of tailers) {
-      await tailer.stop();
-    }
-    sseHub.close();
-    server.close(() => {
-      clearTimeout(forceExit);
-      process.exit(0);
-    });
-  };
+  const shutdown = createShutdown({ tailers, sseHub, server });
 
   process.on('SIGINT', () => void shutdown());
   process.on('SIGTERM', () => void shutdown());
