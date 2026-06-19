@@ -2,12 +2,12 @@
 
 ## Build, test, and lint commands
 
-- Use **Node.js 20+** (`package.json` enforces `node >=20`).
+- Use **Node.js 22+** (`package.json` enforces `node >=22`).
 - Install dependencies with `npm install`.
 - Run the type check with `npm run typecheck`.
 - Run the production build with `npm run build`. This already runs `npm run typecheck`, bundles `src/server/index.ts` and `src/client/main.ts` with esbuild, recreates `dist/`, and copies `index.html`, `styles.css`, and the SVG assets into `dist/client`.
 - Run the built app with `npm run start`.
-- There is currently **no `npm test` script, no lint script, and no single-test command** configured in this repository.
+- Run the test suite with `npm test` (Node's built-in test runner via `tsx`, covering `src/server/*.test.ts` and `src/client/*.test.ts`); `npm run test:coverage` adds coverage. There is currently **no lint script and no single-test command** configured in this repository.
 
 ## High-level architecture
 
