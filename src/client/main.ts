@@ -523,7 +523,7 @@ function getRequiredInput<T extends HTMLElement>(id: string): T {
 function getRequiredImage(id: string): HTMLImageElement {
   const element = getRequiredElement(id);
   if (!(element instanceof HTMLImageElement)) {
-    throw new Error(`Expected image element: ${id}`);
+    throw new TypeError(`Expected image element: ${id}`);
   }
 
   return element;
@@ -532,7 +532,7 @@ function getRequiredImage(id: string): HTMLImageElement {
 function getRequiredLink(id: string): HTMLLinkElement {
   const element = getRequiredElement(id);
   if (!(element instanceof HTMLLinkElement)) {
-    throw new Error(`Expected link element: ${id}`);
+    throw new TypeError(`Expected link element: ${id}`);
   }
 
   return element;
