@@ -16,7 +16,7 @@
 - `src/server/index.ts` is the composition root: it loads config, creates the shared `LogBuffer`, `SseHub`, and `LogLineParser`, starts one `LogTailer` per configured source, seeds the initial buffer from both files, and then serves the built client from `dist/client`.
 - `src/server/logTailer.ts` owns file watching and polling. It reads the last N lines for bootstrap, tails appended content, detects missing files / permission errors / rotation / truncation, and emits `SourceStatus` updates.
 - `src/server/logLineParser.ts` turns raw file lines into structured `LogLine` objects. Timestamped header lines start a new group; continuation lines keep their own row but inherit timestamp / level / logger / group context from the last header of the same source.
-- `src/server/routes.ts` exposes `/api/health`, `/api/bootstrap`, and `/api/stream`. `/api/bootstrap` returns buffered lines plus source statuses and client limits; `/api/stream` sends live `log-line`, `source-status`, and heartbeat SSE events.
+- `src/server/routes.ts` exposes `/api/health`, `/api/bootstrap`, `/api/resync`, and `/api/stream`. `/api/bootstrap` returns buffered lines plus source statuses and client limits; `/api/resync?afterId=…` (used by the client after reconnect or tab visibility changes) returns lines after a cursor in `append` mode, or falls back to a full snapshot in `reset` mode when the cursor is no longer buffered or the limit is exceeded; `/api/stream` sends live `log-line`, `source-status`, and heartbeat SSE events.
 - `src/client/main.ts` bootstraps from `/api/bootstrap`, restores persisted UI preferences from `localStorage`, then connects an `EventSource` to `/api/stream`.
 - Rendering is plain DOM code in `src/client/render.ts`; filtering is in `src/client/filters.ts`; client defaults live in `src/client/state.ts`.
 
@@ -40,5 +40,5 @@
 
 ## MCP server configuration
 
-- `.vscode/mcp.json` configures the Playwright MCP server for GitHub Copilot in VS Code.
-- Prefer Playwright MCP for browser-level checks of bootstrap loading, SSE updates, filters, theme/order toggles, and source-status rendering.
+- `.mcp.json` at the repository root configures the SonarQube MCP server (`sonar.exe run mcp`).
+- Use the SonarQube MCP for code-quality and security checks of changed files (issues, coverage, duplications, quality gate).
