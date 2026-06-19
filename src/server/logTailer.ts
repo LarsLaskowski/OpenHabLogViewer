@@ -351,8 +351,8 @@ async function readLastLines(filePath: string, maxLines: number): Promise<TailRe
       // normalizing and splitting the whole accumulated tail on every iteration
       // (issue #66). Each line terminator marks one complete line, which is all
       // we need to decide when enough lines have been collected.
-      for (let index = 0; index < chunk.length; index += 1) {
-        if (chunk[index] === 0x0a) {
+      for (const byte of chunk) {
+        if (byte === 0x0a) {
           newlineCount += 1;
         }
       }
