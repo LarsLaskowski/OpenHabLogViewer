@@ -390,10 +390,16 @@ function connectStream(): void {
 
   stream.addEventListener('source-status', (event) => {
     noteStreamActivity();
+    let status: SourceStatus;
+    try {
+      status = JSON.parse((event as MessageEvent<string>).data) as SourceStatus;
+    } catch (error) {
+      console.warn('Ignoring malformed source-status SSE payload.', error);
+      return;
+    }
     const completeSseTiming = performanceMonitor.startTiming('sse', 'source-status', {
       visibilityState: document.visibilityState
     });
-    const status = JSON.parse((event as MessageEvent<string>).data) as SourceStatus;
     state.statuses[status.source] = status;
     markSourceStatusRenderPending(1);
     completeSseTiming({
@@ -411,12 +417,18 @@ function connectStream(): void {
 
   stream.addEventListener('log-line', (event) => {
     noteStreamActivity();
+    let line: LogLine;
+    try {
+      line = JSON.parse((event as MessageEvent<string>).data) as LogLine;
+    } catch (error) {
+      console.warn('Ignoring malformed log-line SSE payload.', error);
+      return;
+    }
     const completeSseTiming = performanceMonitor.startTiming('sse', 'log-line', {
       bufferedBefore: state.lines.length,
       paused: state.paused,
       visibilityState: document.visibilityState
     });
-    const line = JSON.parse((event as MessageEvent<string>).data) as LogLine;
     if (syncState.resyncPromise) {
       const queued = queueLiveLineDuringResync(line);
       completeSseTiming({
