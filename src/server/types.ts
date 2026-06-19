@@ -17,6 +17,7 @@ export interface AppConfig {
   clientMaxRenderedLines: number;
   maxSseClients: number;
   maxSseClientsPerIp: number;
+  pollIntervalMs: number;
   trustProxy: boolean | number | string;
   sources: SourceConfig[];
 }

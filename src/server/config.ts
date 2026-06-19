@@ -86,6 +86,10 @@ export function loadConfig(): AppConfig {
     clientMaxRenderedLines: clampInteger('CLIENT_MAX_RENDERED_LINES', 500, 100, 500),
     maxSseClients: clampInteger('MAX_SSE_CLIENTS', 10, 1, 1_000),
     maxSseClientsPerIp: clampInteger('MAX_SSE_CLIENTS_PER_IP', 3, 1, 1_000),
+    // Bound the file poll interval so low-volume deployments can slow polling to
+    // reduce wakeups and high-volume ones can speed it up, while keeping the
+    // floor high enough to avoid hammering the filesystem (see issue #43).
+    pollIntervalMs: clampInteger('POLL_INTERVAL_MS', 1_000, 100, 5_000),
     trustProxy: parseTrustProxy('TRUST_PROXY'),
     sources: [
       resolveSourceConfig('events', process.env.EVENTS_LOG_PATH, logDir, 'events.log'),

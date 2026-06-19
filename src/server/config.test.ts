@@ -12,6 +12,7 @@ const CONFIG_ENV_KEYS = [
   'CLIENT_MAX_RENDERED_LINES',
   'MAX_SSE_CLIENTS',
   'MAX_SSE_CLIENTS_PER_IP',
+  'POLL_INTERVAL_MS',
   'TRUST_PROXY',
   'OPENHAB_LOG_DIR',
   'EVENTS_LOG_PATH',
@@ -47,6 +48,7 @@ describe('loadConfig defaults', () => {
     assert.equal(config.clientMaxRenderedLines, 500);
     assert.equal(config.maxSseClients, 10);
     assert.equal(config.maxSseClientsPerIp, 3);
+    assert.equal(config.pollIntervalMs, 1000);
     assert.equal(config.trustProxy, false);
     assert.equal(config.sources.length, 2);
     assert.equal(config.sources[0].source, 'events');
@@ -80,6 +82,14 @@ describe('loadConfig integer clamping', () => {
   it('falls back to the default for non-positive values', () => {
     process.env.MAX_SSE_CLIENTS = '0';
     assert.equal(loadConfig().maxSseClients, 10);
+  });
+
+  it('clamps POLL_INTERVAL_MS to the [100, 5000] range', () => {
+    process.env.POLL_INTERVAL_MS = '10';
+    assert.equal(loadConfig().pollIntervalMs, 100);
+
+    process.env.POLL_INTERVAL_MS = '99999';
+    assert.equal(loadConfig().pollIntervalMs, 5000);
   });
 });
 

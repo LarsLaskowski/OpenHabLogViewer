@@ -27,6 +27,7 @@ Live web UI for `events.log` and `openhab.log` built with Node.js, Express, and 
 | `CLIENT_MAX_RENDERED_LINES` | `500` | Maximum number of lines kept in the browser buffer. **Hard-capped at 500**: the browser clamps higher values to 500 to stay responsive under live updates, so the accepted range is `100`–`500`. |
 | `MAX_SSE_CLIENTS` | `10` | Maximum number of concurrent SSE stream connections; excess requests receive HTTP 503 |
 | `MAX_SSE_CLIENTS_PER_IP` | `3` | Maximum number of concurrent SSE stream connections per client IP; excess requests receive HTTP 503. Prevents a single client from consuming all global slots. |
+| `POLL_INTERVAL_MS` | `1000` | Interval in milliseconds between file polls for each log source. Lower it for faster live updates on high-volume deployments, raise it to reduce wakeups on low-volume ones. Clamped to the range `100`–`5000`. |
 | `TRUST_PROXY` | `false` | Express `trust proxy` setting. Leave off for direct deployments. Set to the number of proxy hops (e.g. `1`) when running behind a reverse proxy so rate limiting keys on the real client IP. Also accepts `true`, a preset (`loopback`), or a comma-separated list of IPs/subnets. |
 
 `EVENTS_LOG_PATH` and `OPENHAB_LOG_PATH` take precedence over `OPENHAB_LOG_DIR`.
