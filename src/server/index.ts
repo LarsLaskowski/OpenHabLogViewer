@@ -119,7 +119,16 @@ function createIdleStatus(source: { source: SourceStatus['source']; fileName: st
   };
 }
 
-main().catch((error: unknown) => {
-  console.error('[startup] Fatal error:', error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+// The server bundle is CommonJS (dist/server/index.cjs), where top-level await
+// is unavailable, so startup runs through a fire-and-forget async wrapper that
+// reports fatal errors itself instead of a top-level promise chain.
+async function run(): Promise<void> {
+  try {
+    await main();
+  } catch (error) {
+    console.error('[startup] Fatal error:', error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
+}
+
+void run();
