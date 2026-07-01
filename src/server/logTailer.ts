@@ -1,5 +1,6 @@
 import { FSWatcher, Stats, watch } from 'node:fs';
 import { dirname } from 'node:path';
+import { StringDecoder } from 'node:string_decoder';
 import { clearInterval, setInterval } from 'node:timers';
 import { open, stat } from 'node:fs/promises';
 import { LogLineDraft, SourceConfig, SourceState, SourceStatus } from './types.js';
@@ -45,6 +46,10 @@ export class LogTailer {
   private offset = 0;
   private currentFileKey: string | null = null;
   private pendingChunk = '';
+  // Persistent decoder for the streamed byte ranges: a multi-byte UTF-8
+  // character split across two sync cycles must be buffered here instead of
+  // being decoded per range, which would turn both halves into U+FFFD.
+  private utf8Decoder = new StringDecoder('utf8');
   private syncInFlight = false;
   private syncQueued = false;
   private hasLoadedInitialLines = false;
@@ -130,7 +135,7 @@ export class LogTailer {
     const { lines, size } = await readLastLines(this.sourceConfig.filePath, this.initialLinesPerFile);
     this.offset = size;
     this.currentFileKey = nextFileKey;
-    this.pendingChunk = '';
+    this.resetPartialLine();
     this.emitStatus('watching', `Reattached to ${this.sourceConfig.fileName}`);
     if (lines.length > 0) {
       this.onLines(lines.map((line) => this.parser.parse(this.sourceConfig, line)));
@@ -141,7 +146,7 @@ export class LogTailer {
     const { lines, size } = await readLastLines(this.sourceConfig.filePath, this.initialLinesPerFile);
     this.offset = size;
     this.currentFileKey = nextFileKey;
-    this.pendingChunk = '';
+    this.resetPartialLine();
     this.emitStatus(
       'rotated',
       `Skipped ${formatBytes(delta)} backlog for ${this.sourceConfig.fileName}; showing latest lines`
@@ -179,13 +184,13 @@ export class LogTailer {
       if (this.currentFileKey !== nextFileKey) {
         this.currentFileKey = nextFileKey;
         this.offset = 0;
-        this.pendingChunk = '';
+        this.resetPartialLine();
         this.emitStatus('rotated', `Detected rotation for ${this.sourceConfig.fileName}`);
       }
 
       if (fileStats.size < this.offset) {
         this.offset = 0;
-        this.pendingChunk = '';
+        this.resetPartialLine();
         this.emitStatus('rotated', `Detected truncation for ${this.sourceConfig.fileName}`);
       }
 
@@ -220,8 +225,19 @@ export class LogTailer {
     }
   }
 
-  private consumeChunk(chunk: string): string[] {
-    const normalized = `${this.pendingChunk}${chunk}`.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+  // Discard any partially accumulated line together with any partial multi-byte
+  // sequence held by the decoder. Required whenever the next read no longer
+  // continues the previously read bytes (rotation, truncation, reattach,
+  // skip-ahead, missing file).
+  private resetPartialLine(): void {
+    this.pendingChunk = '';
+    this.utf8Decoder = new StringDecoder('utf8');
+  }
+
+  private consumeChunk(chunk: Buffer): string[] {
+    const normalized = `${this.pendingChunk}${this.utf8Decoder.write(chunk)}`
+      .replaceAll('\r\n', '\n')
+      .replaceAll('\r', '\n');
     const parts = normalized.split('\n');
 
     if (normalized.endsWith('\n')) {
@@ -250,7 +266,7 @@ export class LogTailer {
       if (code === 'ENOENT') {
         this.offset = 0;
         this.currentFileKey = null;
-        this.pendingChunk = '';
+        this.resetPartialLine();
         console.log(`[tailer] ${this.sourceConfig.filePath}: ENOENT`);
         this.emitStatus('missing', `File not found: ${this.sourceConfig.fileName}`);
         return null;
@@ -298,16 +314,19 @@ function formatBytes(bytes: number): string {
   return `${bytes} B`;
 }
 
-async function readRange(filePath: string, offset: number, length: number): Promise<string> {
+// Returns the raw bytes so the caller can decode them through its persistent
+// StringDecoder; decoding each range independently here would corrupt a
+// multi-byte character that spans two ranges.
+async function readRange(filePath: string, offset: number, length: number): Promise<Buffer> {
   if (length <= 0) {
-    return '';
+    return Buffer.alloc(0);
   }
 
   const fileHandle = await open(filePath, 'r');
   try {
     const buffer = Buffer.alloc(length);
     const { bytesRead } = await fileHandle.read(buffer, 0, length, offset);
-    return buffer.subarray(0, bytesRead).toString('utf8');
+    return buffer.subarray(0, bytesRead);
   } finally {
     await fileHandle.close();
   }

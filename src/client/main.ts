@@ -31,17 +31,17 @@ const connectionStatusElement = getRequiredElement('connection-status');
 const controlsElement = getRequiredElement('controls-panel');
 const sourceStatusListElement = getRequiredElement('source-status-list');
 const logContainerElement = getRequiredElement('log-container');
-const sourceFilterElement = getRequiredInput<HTMLSelectElement>('source-filter');
-const levelFilterElement = getRequiredInput<HTMLSelectElement>('level-filter');
-const textFilterElement = getRequiredInput<HTMLInputElement>('text-filter');
-const themeSelectElement = getRequiredInput<HTMLSelectElement>('theme-select');
-const orderSelectElement = getRequiredInput<HTMLSelectElement>('order-select');
-const autoScrollElement = getRequiredInput<HTMLInputElement>('auto-scroll');
-const pauseToggleElement = getRequiredInput<HTMLInputElement>('pause-toggle');
-const hideSourceToggleElement = getRequiredInput<HTMLInputElement>('hide-source-toggle');
-const clearButtonElement = getRequiredInput<HTMLButtonElement>('clear-button');
-const faviconElement = getRequiredLink('app-favicon');
-const brandImageElement = getRequiredImage('app-brand-image');
+const sourceFilterElement = getRequiredTypedElement('source-filter', HTMLSelectElement);
+const levelFilterElement = getRequiredTypedElement('level-filter', HTMLSelectElement);
+const textFilterElement = getRequiredTypedElement('text-filter', HTMLInputElement);
+const themeSelectElement = getRequiredTypedElement('theme-select', HTMLSelectElement);
+const orderSelectElement = getRequiredTypedElement('order-select', HTMLSelectElement);
+const autoScrollElement = getRequiredTypedElement('auto-scroll', HTMLInputElement);
+const pauseToggleElement = getRequiredTypedElement('pause-toggle', HTMLInputElement);
+const hideSourceToggleElement = getRequiredTypedElement('hide-source-toggle', HTMLInputElement);
+const clearButtonElement = getRequiredTypedElement('clear-button', HTMLButtonElement);
+const faviconElement = getRequiredTypedElement('app-favicon', HTMLLinkElement);
+const brandImageElement = getRequiredTypedElement('app-brand-image', HTMLImageElement);
 let initialStreamOpenTiming: CompleteClientTiming | null = null;
 let reconnectTiming: CompleteClientTiming | null = null;
 let hasSeenStreamOpen = false;
@@ -516,23 +516,10 @@ function getRequiredElement(id: string): HTMLElement {
   return element;
 }
 
-function getRequiredInput<T extends HTMLElement>(id: string): T {
-  return getRequiredElement(id) as T;
-}
-
-function getRequiredImage(id: string): HTMLImageElement {
+function getRequiredTypedElement<T extends HTMLElement>(id: string, elementType: new () => T): T {
   const element = getRequiredElement(id);
-  if (!(element instanceof HTMLImageElement)) {
-    throw new TypeError(`Expected image element: ${id}`);
-  }
-
-  return element;
-}
-
-function getRequiredLink(id: string): HTMLLinkElement {
-  const element = getRequiredElement(id);
-  if (!(element instanceof HTMLLinkElement)) {
-    throw new TypeError(`Expected link element: ${id}`);
+  if (!(element instanceof elementType)) {
+    throw new TypeError(`Expected ${elementType.name} element: ${id}`);
   }
 
   return element;

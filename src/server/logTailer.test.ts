@@ -89,6 +89,29 @@ describe('LogTailer', () => {
     }
   });
 
+  it('decodes multi-byte UTF-8 characters split across sync cycles', async () => {
+    const h = makeHarness();
+    try {
+      writeFileSync(h.filePath, '');
+      await h.tailer.start();
+
+      // 'ü' encodes as 0xC3 0xBC; append the two halves in separate sync
+      // cycles so the byte sequence is split at a poll boundary.
+      const encoded = Buffer.from('Küche änderte sich\n', 'utf8');
+      appendFileSync(h.filePath, encoded.subarray(0, 2)); // 'K' + first byte of 'ü'
+      await delay(150);
+      appendFileSync(h.filePath, encoded.subarray(2));
+      await delay(150);
+
+      assert.ok(
+        h.lines.some((l) => l.rawLine === 'Küche änderte sich'),
+        `expected an intact line, got: ${JSON.stringify(h.lines.map((l) => l.rawLine))}`
+      );
+    } finally {
+      await cleanup(h);
+    }
+  });
+
   it('does not load a huge unterminated line into memory on bootstrap (byte cap)', async () => {
     const h = makeHarness();
     try {
