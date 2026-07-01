@@ -119,9 +119,11 @@ function createIdleStatus(source: { source: SourceStatus['source']; fileName: st
   };
 }
 
-// The server bundle is CommonJS (dist/server/index.cjs), where top-level await
-// is unavailable, so startup runs through a fire-and-forget async wrapper that
-// reports fatal errors itself instead of a top-level promise chain.
+// Sonar suggests top-level await here, but the server bundle is CommonJS
+// (dist/server/index.cjs) and esbuild rejects top-level await in cjs output,
+// while the deployment shape (systemd unit, release packaging) requires the
+// .cjs entry point. Startup therefore runs through a fire-and-forget async
+// wrapper that reports fatal errors itself.
 async function run(): Promise<void> {
   try {
     await main();
@@ -131,4 +133,4 @@ async function run(): Promise<void> {
   }
 }
 
-void run();
+void run(); // NOSONAR -- top-level await is unavailable in the CommonJS server bundle
