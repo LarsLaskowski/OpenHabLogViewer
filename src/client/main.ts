@@ -1,3 +1,4 @@
+import { getRequiredElement, getRequiredTypedElement } from './dom.js';
 import { createClientPerformanceMonitor } from './performance.js';
 import { renderConnectionStatus, renderLogLines, renderSourceStatuses } from './render.js';
 import { DerivedLogView } from './derivedLogView.js';
@@ -505,24 +506,6 @@ function renderAllImmediate(renderReason: string): number {
   cancelPendingSearchInputRender();
   cancelScheduledLiveRender();
   return renderAll(renderReason);
-}
-
-function getRequiredElement(id: string): HTMLElement {
-  const element = document.getElementById(id);
-  if (!element) {
-    throw new Error(`Missing required element: ${id}`);
-  }
-
-  return element;
-}
-
-function getRequiredTypedElement<T extends HTMLElement>(id: string, elementType: new () => T): T {
-  const element = getRequiredElement(id);
-  if (!(element instanceof elementType)) {
-    throw new TypeError(`Expected ${elementType.name} element: ${id}`);
-  }
-
-  return element;
 }
 
 function applyStoredPreferences(preferences: StoredUiPreferences): void {

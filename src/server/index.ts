@@ -3,12 +3,13 @@ import path from 'node:path';
 import rateLimit from 'express-rate-limit';
 import { loadConfig } from './config.js';
 import { LogBuffer } from './logBuffer.js';
-import { LogLineDraft, SourceStatus } from './types.js';
+import { SourceStatus } from './types.js';
 import { LogLineParser } from './logLineParser.js';
 import { LogTailer } from './logTailer.js';
 import { createApiRouter } from './routes.js';
 import { createShutdown } from './shutdown.js';
 import { SseHub } from './sseHub.js';
+import { createSeededLinePusher } from './startupSeed.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -16,25 +17,7 @@ async function main(): Promise<void> {
   const sseHub = new SseHub(15_000, config.maxSseClients, config.maxSseClientsPerIp);
   const parser = new LogLineParser();
   const sourceStatuses = new Map(config.sources.map((source) => [source.source, createIdleStatus(source)]));
-
-  // Tailers can emit live lines (watcher events, polls) while the initial seed
-  // below is still being collected. Pushing those into the buffer immediately
-  // would give them lower ids than the older bootstrap lines pushed afterwards
-  // and misorder the view, so they are queued until the seed is in place.
-  let initialSeedDone = false;
-  const preSeedLines: LogLineDraft[] = [];
-
-  const pushLiveLines = (lines: LogLineDraft[]): void => {
-    if (!initialSeedDone) {
-      preSeedLines.push(...lines);
-      return;
-    }
-
-    for (const line of lines) {
-      const persisted = buffer.push(line);
-      sseHub.broadcast('log-line', persisted);
-    }
-  };
+  const linePusher = createSeededLinePusher(buffer, sseHub);
 
   const updateStatus = (status: SourceStatus): void => {
     sourceStatuses.set(status.source, status);
@@ -47,19 +30,14 @@ async function main(): Promise<void> {
         sourceConfig,
         initialLinesPerFile: config.initialLinesPerFile,
         parser,
-        onLines: pushLiveLines,
+        onLines: linePusher.pushLiveLines,
         onStatus: updateStatus,
         pollIntervalMs: config.pollIntervalMs
       })
   );
 
   const initialLines = (await Promise.all(tailers.map((tailer) => tailer.start()))).flat();
-
-  for (const line of sortInitialLines(initialLines)) {
-    buffer.push(line);
-  }
-  initialSeedDone = true;
-  pushLiveLines(preSeedLines.splice(0));
+  linePusher.seedInitialLines(initialLines);
 
   const app = express();
   app.disable('x-powered-by');
@@ -129,37 +107,6 @@ function securityHeaders(_request: express.Request, response: express.Response, 
   response.setHeader('X-Frame-Options', 'DENY');
   response.setHeader('Referrer-Policy', 'no-referrer');
   next();
-}
-
-// Initial sort is by timestamp only, so lines from different sources that share
-// the same millisecond can interleave. This means a multi-line group from one
-// source can be split by a line from the other source during the one-time
-// bootstrap seed; live tailing preserves per-source order afterwards.
-//
-// Lines without their own timestamp inherit the last timestamp seen for their
-// source (or sort first when none exists yet), and the original index breaks
-// ties. Sorting on a precomputed key keeps the comparator consistent —
-// a comparator that returns 0 whenever a timestamp is missing is not
-// transitive, and Array.sort guarantees nothing for inconsistent comparators.
-function sortInitialLines(lines: LogLineDraft[]): LogLineDraft[] {
-  const lastTimestampBySource = new Map<string, string>();
-  const decorated = lines.map((line, index) => {
-    if (line.timestamp) {
-      lastTimestampBySource.set(line.source, line.timestamp);
-    }
-
-    return { line, index, sortKey: line.timestamp ?? lastTimestampBySource.get(line.source) ?? '' };
-  });
-
-  decorated.sort((left, right) => {
-    if (left.sortKey !== right.sortKey) {
-      return left.sortKey < right.sortKey ? -1 : 1;
-    }
-
-    return left.index - right.index;
-  });
-
-  return decorated.map((entry) => entry.line);
 }
 
 function createIdleStatus(source: { source: SourceStatus['source']; fileName: string }): SourceStatus {

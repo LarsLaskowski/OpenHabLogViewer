@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
+import { mkdtempSync, renameSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { LogTailer } from './logTailer.js';
@@ -84,6 +84,45 @@ describe('LogTailer', () => {
       await delay(150);
       assert.ok(h.statuses.some((s) => s.state === 'rotated'));
       assert.ok(h.lines.some((l) => l.rawLine === 'short'));
+    } finally {
+      await cleanup(h);
+    }
+  });
+
+  it('detects rotation to a new file and tails the replacement from the start', async () => {
+    const h = makeHarness();
+    try {
+      writeFileSync(h.filePath, 'old line\n');
+      await h.tailer.start();
+
+      // Classic logrotate move: rename the current file away and create a new
+      // one under the same name. Both calls run synchronously in one tick, so
+      // the next sync sees the replacement file (new inode) directly.
+      renameSync(h.filePath, `${h.filePath}.1`);
+      writeFileSync(h.filePath, 'fresh line\n');
+      await delay(200);
+
+      assert.ok(h.statuses.some((s) => s.state === 'rotated'));
+      assert.ok(h.lines.some((l) => l.rawLine === 'fresh line'));
+    } finally {
+      await cleanup(h);
+    }
+  });
+
+  it('reattaches when a missing file reappears', async () => {
+    const h = makeHarness();
+    try {
+      writeFileSync(h.filePath, 'before\n');
+      await h.tailer.start();
+
+      rmSync(h.filePath);
+      await delay(150);
+      assert.ok(h.statuses.some((s) => s.state === 'missing'));
+
+      writeFileSync(h.filePath, 'after\n');
+      await delay(200);
+      assert.ok(h.statuses.some((s) => s.message.startsWith('Reattached')));
+      assert.ok(h.lines.some((l) => l.rawLine === 'after'));
     } finally {
       await cleanup(h);
     }

@@ -125,6 +125,9 @@ describe('loadConfig health details parsing', () => {
     process.env.HEALTH_DETAILS = '1';
     assert.equal(loadConfig().healthDetails, true);
 
+    process.env.HEALTH_DETAILS = 'false';
+    assert.equal(loadConfig().healthDetails, false);
+
     process.env.HEALTH_DETAILS = '0';
     assert.equal(loadConfig().healthDetails, false);
 
