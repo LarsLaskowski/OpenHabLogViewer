@@ -19,6 +19,7 @@ export interface AppConfig {
   maxSseClientsPerIp: number;
   pollIntervalMs: number;
   trustProxy: boolean | number | string;
+  healthDetails: boolean;
   sources: SourceConfig[];
 }
 

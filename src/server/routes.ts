@@ -18,6 +18,14 @@ export function createApiRouter(dependencies: RouteDependencies): Router {
   );
 
   router.get('/health', (_request: Request, response: Response) => {
+    // The detailed payload exposes host information (pid, uptime, log file
+    // states) to anyone who can reach the endpoint — e.g. through a reverse
+    // proxy — so it is only included when HEALTH_DETAILS is enabled.
+    if (!dependencies.config.healthDetails) {
+      response.json({ status: 'ok' });
+      return;
+    }
+
     response.json({
       status: 'ok',
       pid: process.pid,
