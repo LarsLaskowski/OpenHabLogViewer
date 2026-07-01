@@ -128,7 +128,9 @@ async function run(): Promise<void> {
   try {
     await main();
   } catch (error) {
-    console.error('[startup] Fatal error:', error instanceof Error ? error.message : error);
+    // Log the error object itself so unexpected failures keep their stack
+    // trace; for the expected case (invalid config) the message leads anyway.
+    console.error('[startup] Fatal error:', error);
     process.exit(1);
   }
 }

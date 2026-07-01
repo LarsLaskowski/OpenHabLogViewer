@@ -13,7 +13,7 @@ export interface SeededLinePusher {
 // Tailers can emit live lines (watcher events, polls) while the initial seed is
 // still being collected. Pushing those into the buffer immediately would give
 // them lower ids than the older bootstrap lines pushed afterwards and misorder
-// the view, so they are queued until seedInitialLines has run.
+// the view, so they are queued and sorted into the seed by seedInitialLines.
 export function createSeededLinePusher(buffer: LogBuffer, sseHub: LogLineBroadcaster): SeededLinePusher {
   let initialSeedDone = false;
   const preSeedLines: LogLineDraft[] = [];
@@ -31,12 +31,17 @@ export function createSeededLinePusher(buffer: LogBuffer, sseHub: LogLineBroadca
   };
 
   const seedInitialLines = (lines: LogLineDraft[]): void => {
-    for (const line of sortInitialLines(lines)) {
+    // Queued pre-seed live lines are sorted together with the seed instead of
+    // being appended after it: a live line from one source can be
+    // chronologically older than another source's seed lines when that
+    // source's seed read is slow. No SSE client can be connected yet (the
+    // server only starts listening after seeding), so buffering without
+    // broadcasting is correct.
+    for (const line of sortInitialLines([...lines, ...preSeedLines.splice(0)])) {
       buffer.push(line);
     }
 
     initialSeedDone = true;
-    pushLiveLines(preSeedLines.splice(0));
   };
 
   return { pushLiveLines, seedInitialLines };

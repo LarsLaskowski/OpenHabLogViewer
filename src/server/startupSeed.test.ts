@@ -73,18 +73,24 @@ describe('createSeededLinePusher', () => {
     return { buffer, broadcasts, pusher };
   }
 
-  it('queues live lines that arrive before the seed and flushes them after it', () => {
+  it('queues live lines that arrive before the seed and sorts them into it', () => {
     const { buffer, broadcasts, pusher } = makePusher();
 
-    pusher.pushLiveLines([draft({ rawLine: 'live-early' })]);
+    // A live line from one source that is chronologically older than the other
+    // source's seed lines (that source's seed read was slower).
+    pusher.pushLiveLines([draft({ rawLine: 'live-early', timestamp: '2026-01-01T00:00:01.000Z' })]);
     assert.equal(buffer.getItems().length, 0);
     assert.equal(broadcasts.length, 0);
 
-    pusher.seedInitialLines([draft({ rawLine: 'seed-1' }), draft({ rawLine: 'seed-2' })]);
+    pusher.seedInitialLines([
+      draft({ rawLine: 'seed-1', source: 'openhab', timestamp: '2026-01-01T00:00:00.000Z' }),
+      draft({ rawLine: 'seed-2', source: 'openhab', timestamp: '2026-01-01T00:00:02.000Z' })
+    ]);
 
-    // Seed lines get the lowest ids; the queued live line follows them.
-    assert.deepEqual(buffer.getItems().map((line) => line.rawLine), ['seed-1', 'seed-2', 'live-early']);
-    assert.deepEqual(broadcasts.map((line) => line.rawLine), ['live-early']);
+    // The queued live line is sorted between the seed lines by timestamp; no
+    // broadcast happens because no SSE client can be connected before seeding.
+    assert.deepEqual(buffer.getItems().map((line) => line.rawLine), ['seed-1', 'live-early', 'seed-2']);
+    assert.equal(broadcasts.length, 0);
   });
 
   it('pushes and broadcasts live lines directly once seeded', () => {

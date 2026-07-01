@@ -1,37 +1,15 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 
 // main.ts resolves all of its control elements at module scope (via the
-// instanceof-checked lookups), so the DOM — mirroring the ids and element
-// types of index.html — and the element constructors must be installed as
-// globals before the module is imported.
-const dom = new JSDOM(
-  `<!doctype html>
-  <html>
-    <head>
-      <link id="app-favicon" rel="icon" href="./assets/openHAB_appicon.svg" />
-    </head>
-    <body>
-      <img id="app-brand-image" src="./assets/openHAB_workswith.svg" alt="openHAB logo" />
-      <div id="connection-status"></div>
-      <section id="controls-panel">
-        <select id="source-filter"><option value="all">Both</option></select>
-        <select id="level-filter"><option value="all">All</option></select>
-        <input id="text-filter" type="search" />
-        <select id="theme-select"><option value="light">Light</option></select>
-        <select id="order-select"><option value="newest-first">Newest first</option></select>
-        <input id="auto-scroll" type="checkbox" />
-        <input id="pause-toggle" type="checkbox" />
-        <input id="hide-source-toggle" type="checkbox" />
-        <button id="clear-button" type="button">Clear</button>
-        <div id="source-status-list"></div>
-      </section>
-      <main id="log-container"></main>
-    </body>
-  </html>`,
-  { url: 'http://localhost/' }
-);
+// instanceof-checked lookups), so the DOM and the element constructors must be
+// installed as globals before the module is imported. The real index.html is
+// loaded so the test cannot silently diverge from the shipped markup; jsdom
+// does not execute the module script or fetch the referenced assets.
+const html = readFileSync(new URL('./index.html', import.meta.url), 'utf8');
+const dom = new JSDOM(html, { url: 'http://localhost/' });
 
 globalThis.document = dom.window.document as unknown as Document;
 globalThis.location = dom.window.location as unknown as Location;
