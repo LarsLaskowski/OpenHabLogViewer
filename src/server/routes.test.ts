@@ -20,6 +20,7 @@ function baseConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     maxSseClientsPerIp: 3,
     pollIntervalMs: 1000,
     trustProxy: false,
+    healthDetails: false,
     sources: [],
     ...overrides
   };
@@ -77,13 +78,26 @@ async function startApp(opts: {
 }
 
 describe('GET /api/health', () => {
-  it('returns ok with SSE client info', async () => {
+  it('returns only the status by default (no host details)', async () => {
     const ctx = await startApp();
     try {
       const res = await fetch(`${ctx.base}/api/health`);
       assert.equal(res.status, 200);
-      const body = (await res.json()) as { status: string; sseClients: { current: number; max: number } };
+      const body = (await res.json()) as Record<string, unknown>;
+      assert.deepEqual(body, { status: 'ok' });
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  it('returns the detailed payload when healthDetails is enabled', async () => {
+    const ctx = await startApp({ config: { healthDetails: true } });
+    try {
+      const res = await fetch(`${ctx.base}/api/health`);
+      assert.equal(res.status, 200);
+      const body = (await res.json()) as { status: string; pid: number; sseClients: { current: number; max: number } };
       assert.equal(body.status, 'ok');
+      assert.equal(body.pid, process.pid);
       assert.equal(body.sseClients.max, 10);
     } finally {
       await ctx.close();

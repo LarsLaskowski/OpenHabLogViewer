@@ -48,6 +48,24 @@ function resolveSourceConfig(
   };
 }
 
+function parseBooleanFlag(name: string, fallback: boolean): boolean {
+  const rawValue = process.env[name]?.trim().toLowerCase();
+  if (!rawValue) {
+    return fallback;
+  }
+
+  if (rawValue === 'true' || rawValue === '1') {
+    return true;
+  }
+
+  if (rawValue === 'false' || rawValue === '0') {
+    return false;
+  }
+
+  console.warn(`[config] ${name}=${rawValue} is not a boolean; using ${fallback}`);
+  return fallback;
+}
+
 function parseTrustProxy(name: string): boolean | number | string {
   const rawValue = process.env[name]?.trim();
   if (!rawValue) {
@@ -91,6 +109,11 @@ export function loadConfig(): AppConfig {
     // floor high enough to avoid hammering the filesystem (see issue #43).
     pollIntervalMs: clampInteger('POLL_INTERVAL_MS', 1_000, 100, 5_000),
     trustProxy: parseTrustProxy('TRUST_PROXY'),
+    // Off by default: /api/health then only reports { status: 'ok' }. The
+    // detailed payload (pid, uptime, source states, SSE counters) is useful for
+    // local monitoring but leaks host details when the endpoint is reachable
+    // through a reverse proxy, so it is opt-in.
+    healthDetails: parseBooleanFlag('HEALTH_DETAILS', false),
     sources: [
       resolveSourceConfig('events', process.env.EVENTS_LOG_PATH, logDir, 'events.log'),
       resolveSourceConfig('openhab', process.env.OPENHAB_LOG_PATH, logDir, 'openhab.log')

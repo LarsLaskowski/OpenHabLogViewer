@@ -3,12 +3,13 @@ import path from 'node:path';
 import rateLimit from 'express-rate-limit';
 import { loadConfig } from './config.js';
 import { LogBuffer } from './logBuffer.js';
-import { LogLineDraft, SourceStatus } from './types.js';
+import { SourceStatus } from './types.js';
 import { LogLineParser } from './logLineParser.js';
 import { LogTailer } from './logTailer.js';
 import { createApiRouter } from './routes.js';
 import { createShutdown } from './shutdown.js';
 import { SseHub } from './sseHub.js';
+import { createSeededLinePusher } from './startupSeed.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -16,13 +17,7 @@ async function main(): Promise<void> {
   const sseHub = new SseHub(15_000, config.maxSseClients, config.maxSseClientsPerIp);
   const parser = new LogLineParser();
   const sourceStatuses = new Map(config.sources.map((source) => [source.source, createIdleStatus(source)]));
-
-  const pushLiveLines = (lines: LogLineDraft[]): void => {
-    for (const line of lines) {
-      const persisted = buffer.push(line);
-      sseHub.broadcast('log-line', persisted);
-    }
-  };
+  const linePusher = createSeededLinePusher(buffer, sseHub);
 
   const updateStatus = (status: SourceStatus): void => {
     sourceStatuses.set(status.source, status);
@@ -35,19 +30,14 @@ async function main(): Promise<void> {
         sourceConfig,
         initialLinesPerFile: config.initialLinesPerFile,
         parser,
-        onLines: pushLiveLines,
+        onLines: linePusher.pushLiveLines,
         onStatus: updateStatus,
         pollIntervalMs: config.pollIntervalMs
       })
   );
 
-  const initialLines = (await Promise.all(tailers.map((tailer) => tailer.start())))
-    .flat()
-    .sort(compareInitialLines);
-
-  for (const line of initialLines) {
-    buffer.push(line);
-  }
+  const initialLines = (await Promise.all(tailers.map((tailer) => tailer.start()))).flat();
+  linePusher.seedInitialLines(initialLines);
 
   const app = express();
   app.disable('x-powered-by');
@@ -119,18 +109,6 @@ function securityHeaders(_request: express.Request, response: express.Response, 
   next();
 }
 
-// Initial sort is by timestamp only, so lines from different sources that share
-// the same millisecond can interleave. This means a multi-line group from one
-// source can be split by a line from the other source during the one-time
-// bootstrap seed; live tailing preserves per-source order afterwards.
-function compareInitialLines(left: LogLineDraft, right: LogLineDraft): number {
-  if (left.timestamp && right.timestamp) {
-    return left.timestamp.localeCompare(right.timestamp);
-  }
-
-  return 0;
-}
-
 function createIdleStatus(source: { source: SourceStatus['source']; fileName: string }): SourceStatus {
   return {
     source: source.source,
@@ -141,4 +119,20 @@ function createIdleStatus(source: { source: SourceStatus['source']; fileName: st
   };
 }
 
-void main();
+// Sonar suggests top-level await here, but the server bundle is CommonJS
+// (dist/server/index.cjs) and esbuild rejects top-level await in cjs output,
+// while the deployment shape (systemd unit, release packaging) requires the
+// .cjs entry point. Startup therefore runs through a fire-and-forget async
+// wrapper that reports fatal errors itself.
+async function run(): Promise<void> {
+  try {
+    await main();
+  } catch (error) {
+    // Log the error object itself so unexpected failures keep their stack
+    // trace; for the expected case (invalid config) the message leads anyway.
+    console.error('[startup] Fatal error:', error);
+    process.exit(1);
+  }
+}
+
+void run(); // NOSONAR -- top-level await is unavailable in the CommonJS server bundle

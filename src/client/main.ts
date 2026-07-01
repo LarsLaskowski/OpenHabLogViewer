@@ -1,3 +1,4 @@
+import { getRequiredElement, getRequiredTypedElement } from './dom.js';
 import { createClientPerformanceMonitor } from './performance.js';
 import { renderConnectionStatus, renderLogLines, renderSourceStatuses } from './render.js';
 import { DerivedLogView } from './derivedLogView.js';
@@ -31,17 +32,17 @@ const connectionStatusElement = getRequiredElement('connection-status');
 const controlsElement = getRequiredElement('controls-panel');
 const sourceStatusListElement = getRequiredElement('source-status-list');
 const logContainerElement = getRequiredElement('log-container');
-const sourceFilterElement = getRequiredInput<HTMLSelectElement>('source-filter');
-const levelFilterElement = getRequiredInput<HTMLSelectElement>('level-filter');
-const textFilterElement = getRequiredInput<HTMLInputElement>('text-filter');
-const themeSelectElement = getRequiredInput<HTMLSelectElement>('theme-select');
-const orderSelectElement = getRequiredInput<HTMLSelectElement>('order-select');
-const autoScrollElement = getRequiredInput<HTMLInputElement>('auto-scroll');
-const pauseToggleElement = getRequiredInput<HTMLInputElement>('pause-toggle');
-const hideSourceToggleElement = getRequiredInput<HTMLInputElement>('hide-source-toggle');
-const clearButtonElement = getRequiredInput<HTMLButtonElement>('clear-button');
-const faviconElement = getRequiredLink('app-favicon');
-const brandImageElement = getRequiredImage('app-brand-image');
+const sourceFilterElement = getRequiredTypedElement('source-filter', HTMLSelectElement);
+const levelFilterElement = getRequiredTypedElement('level-filter', HTMLSelectElement);
+const textFilterElement = getRequiredTypedElement('text-filter', HTMLInputElement);
+const themeSelectElement = getRequiredTypedElement('theme-select', HTMLSelectElement);
+const orderSelectElement = getRequiredTypedElement('order-select', HTMLSelectElement);
+const autoScrollElement = getRequiredTypedElement('auto-scroll', HTMLInputElement);
+const pauseToggleElement = getRequiredTypedElement('pause-toggle', HTMLInputElement);
+const hideSourceToggleElement = getRequiredTypedElement('hide-source-toggle', HTMLInputElement);
+const clearButtonElement = getRequiredTypedElement('clear-button', HTMLButtonElement);
+const faviconElement = getRequiredTypedElement('app-favicon', HTMLLinkElement);
+const brandImageElement = getRequiredTypedElement('app-brand-image', HTMLImageElement);
 let initialStreamOpenTiming: CompleteClientTiming | null = null;
 let reconnectTiming: CompleteClientTiming | null = null;
 let hasSeenStreamOpen = false;
@@ -505,37 +506,6 @@ function renderAllImmediate(renderReason: string): number {
   cancelPendingSearchInputRender();
   cancelScheduledLiveRender();
   return renderAll(renderReason);
-}
-
-function getRequiredElement(id: string): HTMLElement {
-  const element = document.getElementById(id);
-  if (!element) {
-    throw new Error(`Missing required element: ${id}`);
-  }
-
-  return element;
-}
-
-function getRequiredInput<T extends HTMLElement>(id: string): T {
-  return getRequiredElement(id) as T;
-}
-
-function getRequiredImage(id: string): HTMLImageElement {
-  const element = getRequiredElement(id);
-  if (!(element instanceof HTMLImageElement)) {
-    throw new TypeError(`Expected image element: ${id}`);
-  }
-
-  return element;
-}
-
-function getRequiredLink(id: string): HTMLLinkElement {
-  const element = getRequiredElement(id);
-  if (!(element instanceof HTMLLinkElement)) {
-    throw new TypeError(`Expected link element: ${id}`);
-  }
-
-  return element;
 }
 
 function applyStoredPreferences(preferences: StoredUiPreferences): void {

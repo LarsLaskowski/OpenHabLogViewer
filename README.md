@@ -29,6 +29,7 @@ Live web UI for `events.log` and `openhab.log` built with Node.js, Express, and 
 | `MAX_SSE_CLIENTS_PER_IP` | `3` | Maximum number of concurrent SSE stream connections per client IP; excess requests receive HTTP 503. Prevents a single client from consuming all global slots. |
 | `POLL_INTERVAL_MS` | `1000` | Interval in milliseconds between file polls for each log source. Lower it for faster live updates on high-volume deployments, raise it to reduce wakeups on low-volume ones. Clamped to the range `100`–`5000`. |
 | `TRUST_PROXY` | `false` | Express `trust proxy` setting. Leave off for direct deployments. Set to the number of proxy hops (e.g. `1`) when running behind a reverse proxy so rate limiting keys on the real client IP. Also accepts `true`, a preset (`loopback`), or a comma-separated list of IPs/subnets. |
+| `HEALTH_DETAILS` | `false` | When off, `/api/health` returns only `{ "status": "ok" }`. Set to `true` to include host details (pid, uptime, per-source states, SSE client counts) for local monitoring. Keep it off when the endpoint is reachable through a reverse proxy, so those details are not exposed. |
 
 `EVENTS_LOG_PATH` and `OPENHAB_LOG_PATH` take precedence over `OPENHAB_LOG_DIR`.
 

@@ -14,6 +14,7 @@ const CONFIG_ENV_KEYS = [
   'MAX_SSE_CLIENTS_PER_IP',
   'POLL_INTERVAL_MS',
   'TRUST_PROXY',
+  'HEALTH_DETAILS',
   'OPENHAB_LOG_DIR',
   'EVENTS_LOG_PATH',
   'OPENHAB_LOG_PATH'
@@ -50,6 +51,7 @@ describe('loadConfig defaults', () => {
     assert.equal(config.maxSseClientsPerIp, 3);
     assert.equal(config.pollIntervalMs, 1000);
     assert.equal(config.trustProxy, false);
+    assert.equal(config.healthDetails, false);
     assert.equal(config.sources.length, 2);
     assert.equal(config.sources[0].source, 'events');
     assert.equal(config.sources[0].fileName, 'events.log');
@@ -110,6 +112,27 @@ describe('loadConfig trust proxy parsing', () => {
 
     process.env.TRUST_PROXY = 'loopback';
     assert.equal(loadConfig().trustProxy, 'loopback');
+  });
+});
+
+describe('loadConfig health details parsing', () => {
+  it('defaults to false and accepts true/1/false/0', () => {
+    assert.equal(loadConfig().healthDetails, false);
+
+    process.env.HEALTH_DETAILS = 'true';
+    assert.equal(loadConfig().healthDetails, true);
+
+    process.env.HEALTH_DETAILS = '1';
+    assert.equal(loadConfig().healthDetails, true);
+
+    process.env.HEALTH_DETAILS = 'false';
+    assert.equal(loadConfig().healthDetails, false);
+
+    process.env.HEALTH_DETAILS = '0';
+    assert.equal(loadConfig().healthDetails, false);
+
+    process.env.HEALTH_DETAILS = 'nonsense';
+    assert.equal(loadConfig().healthDetails, false);
   });
 });
 

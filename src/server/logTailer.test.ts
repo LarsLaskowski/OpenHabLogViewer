@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
+import { mkdtempSync, renameSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { LogTailer } from './logTailer.js';
@@ -84,6 +84,68 @@ describe('LogTailer', () => {
       await delay(150);
       assert.ok(h.statuses.some((s) => s.state === 'rotated'));
       assert.ok(h.lines.some((l) => l.rawLine === 'short'));
+    } finally {
+      await cleanup(h);
+    }
+  });
+
+  it('detects rotation to a new file and tails the replacement from the start', async () => {
+    const h = makeHarness();
+    try {
+      writeFileSync(h.filePath, 'old line\n');
+      await h.tailer.start();
+
+      // Classic logrotate move: rename the current file away and create a new
+      // one under the same name. Both calls run synchronously in one tick, so
+      // the next sync sees the replacement file (new inode) directly.
+      renameSync(h.filePath, `${h.filePath}.1`);
+      writeFileSync(h.filePath, 'fresh line\n');
+      await delay(200);
+
+      assert.ok(h.statuses.some((s) => s.state === 'rotated'));
+      assert.ok(h.lines.some((l) => l.rawLine === 'fresh line'));
+    } finally {
+      await cleanup(h);
+    }
+  });
+
+  it('reattaches when a missing file reappears', async () => {
+    const h = makeHarness();
+    try {
+      writeFileSync(h.filePath, 'before\n');
+      await h.tailer.start();
+
+      rmSync(h.filePath);
+      await delay(150);
+      assert.ok(h.statuses.some((s) => s.state === 'missing'));
+
+      writeFileSync(h.filePath, 'after\n');
+      await delay(200);
+      assert.ok(h.statuses.some((s) => s.message.startsWith('Reattached')));
+      assert.ok(h.lines.some((l) => l.rawLine === 'after'));
+    } finally {
+      await cleanup(h);
+    }
+  });
+
+  it('decodes multi-byte UTF-8 characters split across sync cycles', async () => {
+    const h = makeHarness();
+    try {
+      writeFileSync(h.filePath, '');
+      await h.tailer.start();
+
+      // 'ü' encodes as 0xC3 0xBC; append the two halves in separate sync
+      // cycles so the byte sequence is split at a poll boundary.
+      const encoded = Buffer.from('Küche änderte sich\n', 'utf8');
+      appendFileSync(h.filePath, encoded.subarray(0, 2)); // 'K' + first byte of 'ü'
+      await delay(150);
+      appendFileSync(h.filePath, encoded.subarray(2));
+      await delay(150);
+
+      assert.ok(
+        h.lines.some((l) => l.rawLine === 'Küche änderte sich'),
+        `expected an intact line, got: ${JSON.stringify(h.lines.map((l) => l.rawLine))}`
+      );
     } finally {
       await cleanup(h);
     }
