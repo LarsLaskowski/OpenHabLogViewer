@@ -5,6 +5,8 @@ description: Creates a branch, commits the current changes, pushes the branch, o
 
 Use this skill when the user wants the current local changes published to GitHub as a pull request.
 
+All user-facing output you create — branch name, commit message, PR title and body — must be written in **English**, regardless of the language the user wrote in. Never mention Claude, Anthropic, or any other AI/assistant tooling in the PR title or body, and do not add any `Co-Authored-By` trailer, "Generated with" footer, session link, or other note attributing the work to an AI.
+
 Follow this workflow:
 
 1. Inspect the repository state first with non-interactive Git commands:
@@ -25,8 +27,9 @@ Follow this workflow:
 10. Push the branch to `origin` and set upstream tracking.
 11. Create a pull request with GitHub CLI:
     - base branch: `main`, unless the user explicitly requests a different base
-    - title: concise summary of the change
-    - body: short summary of what changed, including the version bump
+    - title: concise English summary of the change
+    - body: short English summary of what changed, including the version bump
+    - Do not add any attribution, "Generated with" footer, or other note referencing an AI/assistant in the PR title or body.
 12. After the pull request is created, switch back to the `main` branch.
 13. Report the branch name and pull request URL clearly.
 

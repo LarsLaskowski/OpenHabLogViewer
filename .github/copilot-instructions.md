@@ -38,6 +38,12 @@
 - Built-in authentication is intentionally out of scope for this app unless explicitly requested; deployment assumes home-network use or an external reverse proxy for auth.
 - Validate builds when code changes affect runtime behavior.
 
+## Pull requests
+
+- Always write pull request titles and descriptions in **English**, regardless of the language used in the request or the conversation.
+- Never mention Claude, Anthropic, Claude Code, Copilot, or any other AI/assistant tooling in a pull request title or description. Do not add `Co-Authored-By` trailers, "Generated with" footers, session links, or any other note attributing the work to an AI.
+- This applies to every PR created for this repository, whether opened directly or through a skill.
+
 ## MCP server configuration
 
 - `.mcp.json` at the repository root configures the SonarQube MCP server (`sonar.exe run mcp`).
