@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Live web viewer for openHAB events.log and openhab.log",
+  "license": "MIT",
   "engines": {
     "node": ">=22"
   },
