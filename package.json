@@ -13,8 +13,8 @@
     "build": "npm run typecheck && node scripts/build.mjs",
     "start": "node dist/server/index.cjs",
     "test": "node --import tsx --test src/server/*.test.ts src/client/*.test.ts",
-    "test:coverage": "node --import tsx --test --experimental-test-coverage src/server/*.test.ts src/client/*.test.ts",
-    "coverage:lcov": "node -e \"require('node:fs').mkdirSync('coverage',{recursive:true})\" && node --import tsx --test --experimental-test-coverage --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info src/server/*.test.ts src/client/*.test.ts"
+    "test:coverage": "node --enable-source-maps --import tsx --test --experimental-test-coverage src/server/*.test.ts src/client/*.test.ts",
+    "coverage:lcov": "node -e \"require('node:fs').mkdirSync('coverage',{recursive:true})\" && node --enable-source-maps --import tsx --test --experimental-test-coverage --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info src/server/*.test.ts src/client/*.test.ts"
   },
   "dependencies": {
     "express": "^5.1.0",
