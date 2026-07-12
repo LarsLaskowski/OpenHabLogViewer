@@ -15,6 +15,7 @@ const CONFIG_ENV_KEYS = [
   'POLL_INTERVAL_MS',
   'TRUST_PROXY',
   'HEALTH_DETAILS',
+  'ALLOWED_HOSTS',
   'OPENHAB_LOG_DIR',
   'EVENTS_LOG_PATH',
   'OPENHAB_LOG_PATH'
@@ -52,6 +53,7 @@ describe('loadConfig defaults', () => {
     assert.equal(config.pollIntervalMs, 1000);
     assert.equal(config.trustProxy, false);
     assert.equal(config.healthDetails, false);
+    assert.deepEqual(config.allowedHosts, []);
     assert.equal(config.sources.length, 2);
     assert.equal(config.sources[0].source, 'events');
     assert.equal(config.sources[0].fileName, 'events.log');
@@ -133,6 +135,22 @@ describe('loadConfig health details parsing', () => {
 
     process.env.HEALTH_DETAILS = 'nonsense';
     assert.equal(loadConfig().healthDetails, false);
+  });
+});
+
+describe('loadConfig allowed hosts parsing', () => {
+  it('defaults to an empty list', () => {
+    assert.deepEqual(loadConfig().allowedHosts, []);
+  });
+
+  it('splits, trims, lowercases and drops empty entries', () => {
+    process.env.ALLOWED_HOSTS = '  OpenHab-Pi , openhab-pi.local ,,192.168.1.10 ';
+    assert.deepEqual(loadConfig().allowedHosts, ['openhab-pi', 'openhab-pi.local', '192.168.1.10']);
+  });
+
+  it('treats a whitespace-only value as unset', () => {
+    process.env.ALLOWED_HOSTS = '   ';
+    assert.deepEqual(loadConfig().allowedHosts, []);
   });
 });
 

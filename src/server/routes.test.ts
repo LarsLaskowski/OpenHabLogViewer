@@ -21,6 +21,7 @@ function baseConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     pollIntervalMs: 1000,
     trustProxy: false,
     healthDetails: false,
+    allowedHosts: [],
     sources: [],
     ...overrides
   };
