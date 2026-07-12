@@ -295,6 +295,57 @@ describe('GET /api/resync', () => {
       await ctx.close();
     }
   });
+
+  it('resets with limit-exceeded for a cursor far behind a large buffer', async () => {
+    // The arithmetic path must reproduce the old behavior without materializing
+    // the whole buffer: 1,000 lines, cursor far behind, limit=10 → the newest
+    // 10 lines in reset mode.
+    const buffer = new LogBuffer(2000);
+    for (let i = 0; i < 1000; i += 1) {
+      buffer.push(draft());
+    }
+    const ctx = await startApp({ buffer });
+    try {
+      const body = (await (await fetch(`${ctx.base}/api/resync?afterId=1&limit=10`)).json()) as {
+        mode: string;
+        resetReason: string;
+        lines: { id: number }[];
+        cursor: { totalBufferedLines: number; truncated: boolean };
+      };
+      assert.equal(body.mode, 'reset');
+      assert.equal(body.resetReason, 'limit-exceeded');
+      assert.equal(body.lines.length, 10);
+      assert.deepEqual(body.lines.map((l) => l.id), [991, 992, 993, 994, 995, 996, 997, 998, 999, 1000]);
+      assert.equal(body.cursor.totalBufferedLines, 1000);
+      assert.equal(body.cursor.truncated, true);
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  it('appends exactly the pending lines when they fit within the limit', async () => {
+    const buffer = new LogBuffer(2000);
+    for (let i = 0; i < 1000; i += 1) {
+      buffer.push(draft());
+    }
+    const ctx = await startApp({ buffer });
+    try {
+      // afterId = newest id - 3, limit 10 → 3 lines in append mode.
+      const body = (await (await fetch(`${ctx.base}/api/resync?afterId=997&limit=10`)).json()) as {
+        mode: string;
+        resetReason: string | null;
+        lines: { id: number }[];
+        cursor: { lastIncludedId: number; truncated: boolean };
+      };
+      assert.equal(body.mode, 'append');
+      assert.equal(body.resetReason, null);
+      assert.deepEqual(body.lines.map((l) => l.id), [998, 999, 1000]);
+      assert.equal(body.cursor.lastIncludedId, 1000);
+      assert.equal(body.cursor.truncated, false);
+    } finally {
+      await ctx.close();
+    }
+  });
 });
 
 describe('GET /api/stream', () => {

@@ -65,6 +65,20 @@ describe('LogBuffer', () => {
     assert.deepEqual(buffer.getItemsAfterId(0).map((line) => line.id), [1, 2, 3, 4, 5]);
   });
 
+  it('getItemsAfterId caps the copy to the newest maxItems lines after the cursor', () => {
+    const buffer = new LogBuffer(100);
+    for (let i = 0; i < 20; i += 1) {
+      buffer.push(draft());
+    }
+
+    // Without a cap the cursor at id 5 yields ids 6..20 (15 lines).
+    assert.equal(buffer.getItemsAfterId(5).length, 15);
+    // With maxItems the copy is bounded to the newest maxItems of those lines.
+    assert.deepEqual(buffer.getItemsAfterId(5, 3).map((line) => line.id), [18, 19, 20]);
+    // A cap larger than the available count leaves the result unchanged.
+    assert.deepEqual(buffer.getItemsAfterId(17, 10).map((line) => line.id), [18, 19, 20]);
+  });
+
   it('keeps the logical order and ids correct after wrapping around capacity', () => {
     const buffer = new LogBuffer(3);
     for (let i = 0; i < 10; i += 1) {
