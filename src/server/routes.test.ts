@@ -203,6 +203,78 @@ describe('GET /api/resync', () => {
     }
   });
 
+  it('resets when the cursor is ahead of the newest id after a server restart', async () => {
+    // Ids restart at 1 on a fresh server; a client that outlived the restart
+    // still holds a large afterId. Without the cursor-ahead check the server
+    // would answer with an empty append and the client would drop every new
+    // line as a "duplicate" (issue #130).
+    const buffer = new LogBuffer(2000);
+    for (let i = 0; i < 3; i += 1) {
+      buffer.push(draft()); // ids 1,2,3
+    }
+    const ctx = await startApp({ buffer });
+    try {
+      const body = (await (await fetch(`${ctx.base}/api/resync?afterId=5000`)).json()) as {
+        mode: string;
+        resetReason: string;
+        lines: { id: number }[];
+      };
+      assert.equal(body.mode, 'reset');
+      assert.equal(body.resetReason, 'cursor-not-available');
+      assert.deepEqual(body.lines.map((l) => l.id), [1, 2, 3]);
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  it('resets on an empty buffer when the cursor is from a previous server life', async () => {
+    const ctx = await startApp({ buffer: new LogBuffer(2000) });
+    try {
+      const body = (await (await fetch(`${ctx.base}/api/resync?afterId=5000`)).json()) as {
+        mode: string;
+        resetReason: string;
+        lines: { id: number }[];
+      };
+      assert.equal(body.mode, 'reset');
+      assert.equal(body.resetReason, 'cursor-not-available');
+      assert.deepEqual(body.lines, []);
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  it('keeps afterId === newestId as an empty append', async () => {
+    const buffer = new LogBuffer(2000);
+    for (let i = 0; i < 3; i += 1) {
+      buffer.push(draft()); // ids 1,2,3
+    }
+    const ctx = await startApp({ buffer });
+    try {
+      const body = (await (await fetch(`${ctx.base}/api/resync?afterId=3`)).json()) as {
+        mode: string;
+        lines: { id: number }[];
+      };
+      assert.equal(body.mode, 'append');
+      assert.deepEqual(body.lines, []);
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  it('keeps afterId=0 on an empty buffer as an empty append (fresh client)', async () => {
+    const ctx = await startApp({ buffer: new LogBuffer(2000) });
+    try {
+      const body = (await (await fetch(`${ctx.base}/api/resync?afterId=0`)).json()) as {
+        mode: string;
+        lines: { id: number }[];
+      };
+      assert.equal(body.mode, 'append');
+      assert.deepEqual(body.lines, []);
+    } finally {
+      await ctx.close();
+    }
+  });
+
   it('resets with limit-exceeded when more lines are pending than the limit', async () => {
     const buffer = new LogBuffer(2000);
     for (let i = 0; i < 5; i += 1) {

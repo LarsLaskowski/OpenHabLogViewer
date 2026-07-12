@@ -1127,7 +1127,18 @@ function applyResyncPayload(payload: ResyncResponse): { appendedCount: number; r
   let renderReason: string | null = null;
 
   if (payload.mode === 'reset') {
-    const preservedLiveLines = state.lines.filter((line) => line.id > (payload.cursor.lastIncludedId ?? -1));
+    // Only preserve buffered lines that are plausible for the current server
+    // instance. After a server restart LogBuffer ids restart at 1, so stale
+    // pre-restart lines carry ids far above the fresh snapshot; the upper
+    // bound discards them (yielding []), while genuine live lines that arrived
+    // during the resync (ids <= newestAvailableId) are kept. Without this the
+    // stale lines would be re-appended and re-arm the large lastSeenLineId.
+    const newestAvailableId = payload.cursor.newestAvailableId;
+    const preservedLiveLines = state.lines.filter(
+      (line) =>
+        line.id > (payload.cursor.lastIncludedId ?? -1) &&
+        (newestAvailableId === null || line.id <= newestAvailableId)
+    );
     replaceBufferedLines(payload.lines, preservedLiveLines);
     syncState.lastSeenLineId = state.lines.at(-1)?.id ?? payload.cursor.lastIncludedId ?? syncState.lastSeenLineId;
     renderReason = 'resync-reset';
@@ -1150,6 +1161,16 @@ function applyResyncPayload(payload: ResyncResponse): { appendedCount: number; r
     statusesApplied: payload.statuses.length > 0
   };
 }
+
+// Test-only access to module-internal state and the resync/append paths. Not
+// used by the browser entry point (init); exported so main.test.ts can exercise
+// the server-restart recovery in applyResyncPayload without a running server.
+export const __testables = {
+  state,
+  syncState,
+  applyResyncPayload,
+  appendBufferedLine
+};
 
 function skipResyncPayloadAfterClear(payload: ResyncResponse): { appendedCount: number; renderReason: string | null; statusesApplied: boolean } {
   applySourceStatuses(payload.statuses);

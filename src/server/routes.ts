@@ -87,8 +87,16 @@ export function createApiRouter(dependencies: RouteDependencies): Router {
       limit,
       snapshotRange.totalLines > snapshotLines.length
     );
+    // A cursor strictly greater than the newest buffered id cannot come from
+    // the current server life: LogBuffer ids restart at 1 on every server
+    // start, so a client that outlived a restart still holds a large stale id.
+    // `afterId === newestId` stays a valid empty append (the normal "nothing
+    // new" case); `?? 0` makes any afterId > 0 a reset on an empty buffer while
+    // a fresh client (afterId = 0) still gets a plain append.
+    const cursorAhead = afterId > (snapshotRange.newestId ?? 0);
     const gapDetected =
-      snapshotCursor.oldestAvailableId !== null && afterId < snapshotCursor.oldestAvailableId - 1;
+      cursorAhead ||
+      (snapshotCursor.oldestAvailableId !== null && afterId < snapshotCursor.oldestAvailableId - 1);
     const linesAfterCursor = gapDetected ? [] : dependencies.buffer.getItemsAfterId(afterId);
 
     let mode: ResyncResponse['mode'] = 'append';
