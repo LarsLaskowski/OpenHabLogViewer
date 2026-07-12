@@ -265,6 +265,80 @@ describe('LogTailer', () => {
     }
   });
 
+  it('survives an FSWatcher error event and keeps tailing via polling (issue #131)', async () => {
+    const h = makeHarness();
+    const capture = captureUnhandledRejections();
+    let uncaught: unknown = null;
+    const onUncaught = (error: unknown): void => {
+      uncaught = error;
+    };
+    process.on('uncaughtException', onUncaught);
+    try {
+      writeFileSync(h.filePath, 'first\n');
+      await h.tailer.start();
+
+      const internals = h.tailer as unknown as {
+        watcher: (import('node:fs').FSWatcher & { emit(event: string, ...args: unknown[]): boolean }) | null;
+      };
+      assert.ok(internals.watcher, 'expected a watcher after start()');
+
+      // Simulate a runtime watcher failure (directory removed, EMFILE, …),
+      // delivered asynchronously as an 'error' event. Without a registered
+      // listener this would be rethrown as an uncaught exception and crash.
+      internals.watcher.emit('error', new Error('simulated inotify failure'));
+
+      // (a) no crash, and (c) the watcher field is cleared.
+      assert.equal(uncaught, null);
+      assert.equal(internals.watcher, null);
+
+      // (b) appended lines are still picked up by the poll loop.
+      appendFileSync(h.filePath, 'after watcher error\n');
+      await delay(200);
+      assert.ok(
+        h.lines.some((l) => l.rawLine === 'after watcher error'),
+        `expected polling to keep tailing, got: ${JSON.stringify(h.lines.map((l) => l.rawLine))}`
+      );
+
+      assert.deepEqual(capture.rejections, []);
+    } finally {
+      process.off('uncaughtException', onUncaught);
+      capture.dispose();
+      await cleanup(h);
+    }
+  });
+
+  it('self-heals the watcher after an error, ignoring a late error from the old instance (issue #131)', async () => {
+    // Poll fast enough that the ~WATCHER_RETRY_POLLS (30) cycle delay before a
+    // re-attach elapses within the test.
+    const h = makeHarness('events.log', 500);
+    try {
+      writeFileSync(h.filePath, 'first\n');
+      await h.tailer.start();
+
+      const internals = h.tailer as unknown as {
+        watcher: (import('node:fs').FSWatcher & { emit(event: string, ...args: unknown[]): boolean }) | null;
+      };
+      const oldWatcher = internals.watcher;
+      assert.ok(oldWatcher, 'expected a watcher after start()');
+
+      oldWatcher.emit('error', new Error('first failure'));
+      assert.equal(internals.watcher, null);
+
+      // The poll loop re-establishes the watch after the retry countdown.
+      await delay(1000);
+      const newWatcher = internals.watcher;
+      assert.ok(newWatcher, 'expected the watcher to be re-established');
+      assert.notEqual(newWatcher, oldWatcher);
+
+      // A late error from the already-replaced old instance must not tear down
+      // the healthy new watcher.
+      oldWatcher.emit('error', new Error('late failure from old instance'));
+      assert.equal(internals.watcher, newWatcher);
+    } finally {
+      await cleanup(h);
+    }
+  });
+
   it('does not load a huge unterminated line into memory on bootstrap (byte cap)', async () => {
     const h = makeHarness();
     try {

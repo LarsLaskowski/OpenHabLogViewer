@@ -26,6 +26,12 @@ const MAX_PENDING_CHUNK_CHARS = 1024 * 1024;
 // far and drop the leading partial line.
 const MAX_TAIL_SCAN_BYTES = 8 * 1024 * 1024;
 
+// Number of poll cycles to wait between attempts to re-establish a dropped
+// directory watch. With the default 1s poll interval this is ~30s, which keeps
+// a permanently failing watch from retrying on every single poll while the
+// poll loop itself continues to tail the file.
+const WATCHER_RETRY_POLLS = 30;
+
 interface LogTailerOptions {
   sourceConfig: SourceConfig;
   initialLinesPerFile: number;
@@ -57,6 +63,10 @@ export class LogTailer {
   private currentMessage = '';
   private pollTimer: NodeJS.Timeout | null = null;
   private watcher: FSWatcher | null = null;
+  // Polls remaining before re-attempting a directory watch that dropped. Set
+  // whenever a watcher dies (async 'error' event or a synchronous creation
+  // failure) so re-attach happens at most once every WATCHER_RETRY_POLLS polls.
+  private watcherRetryCountdown = 0;
 
   constructor(options: LogTailerOptions) {
     this.sourceConfig = options.sourceConfig;
@@ -114,7 +124,7 @@ export class LogTailer {
   private startWatchingDirectory(): void {
     const directory = dirname(this.sourceConfig.filePath);
     try {
-      this.watcher = watch(directory, { persistent: false }, (_event: string, fileName: string | Buffer | null) => {
+      const watcher = watch(directory, { persistent: false }, (_event: string, fileName: string | Buffer | null) => {
         // Trigger only on events for our own file. `!fileName` covers platforms that
         // do not report the filename; renames/rotations of the watched file are still
         // caught by the filename match and the periodic poll fallback. Events for other
@@ -123,9 +133,31 @@ export class LogTailer {
           void this.sync();
         }
       });
-    } catch {
-      console.error(`[tailer] Unable to watch directory: ${directory}`);
-      this.emitStatus('error', `Cannot watch log directory for ${this.sourceConfig.fileName}`);
+      // FSWatcher is an EventEmitter: runtime failures (the directory being
+      // removed/renamed, inotify pressure, EMFILE) arrive asynchronously as an
+      // 'error' event, not as a throw from watch(). Without a listener Node
+      // rethrows them as an uncaught exception and crashes the process. Close
+      // the instance captured in this closure — not this.watcher — so a late
+      // error from a replaced watcher cannot tear down the healthy one a retry
+      // may already have installed. Polling keeps driving sync() meanwhile.
+      watcher.on('error', (error) => {
+        console.error(`[tailer] Watcher error for ${directory}:`, error);
+        watcher.close();
+        if (this.watcher === watcher) {
+          this.watcher = null;
+          this.watcherRetryCountdown = WATCHER_RETRY_POLLS;
+        }
+      });
+      this.watcher = watcher;
+      this.watcherRetryCountdown = 0;
+    } catch (error) {
+      // Only synchronous creation failures land here (e.g. the directory does
+      // not exist yet). The poll loop still tails the file, so this is a
+      // warning rather than a user-facing 'error' status that would wrongly
+      // mark a healthy source as broken. A later sync retries the watch.
+      console.error(`[tailer] Unable to watch directory ${directory}:`, error);
+      this.watcher = null;
+      this.watcherRetryCountdown = WATCHER_RETRY_POLLS;
     }
   }
 
@@ -238,7 +270,26 @@ export class LogTailer {
         this.syncQueued = false;
         void this.sync();
       }
+      this.tryRestartWatcher();
     }
+  }
+
+  // Re-establish the directory watch after it dropped, throttled to at most one
+  // attempt every WATCHER_RETRY_POLLS polls. Runs from sync()'s finally block so
+  // the tailer self-heals once the directory is back, while the poll loop keeps
+  // it functional in the meantime.
+  private tryRestartWatcher(): void {
+    if (this.watcher !== null || this.pollTimer === null) {
+      return;
+    }
+
+    if (this.watcherRetryCountdown > 0) {
+      this.watcherRetryCountdown -= 1;
+      return;
+    }
+
+    // startWatchingDirectory re-arms watcherRetryCountdown if it fails again.
+    this.startWatchingDirectory();
   }
 
   // Discard any partially accumulated line together with any partial multi-byte
