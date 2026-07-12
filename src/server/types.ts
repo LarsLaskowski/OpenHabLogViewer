@@ -20,6 +20,7 @@ export interface AppConfig {
   pollIntervalMs: number;
   trustProxy: boolean | number | string;
   healthDetails: boolean;
+  allowedHosts: string[];
   sources: SourceConfig[];
 }
 

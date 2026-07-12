@@ -17,6 +17,9 @@ Environment=CLIENT_MAX_RENDERED_LINES=500
 # Uncomment to expose host details (pid, uptime, source states) on /api/health.
 # Keep it off when the endpoint is reachable through a reverse proxy:
 # Environment=HEALTH_DETAILS=true
+# Uncomment to reject requests whose Host header is not on the allowlist
+# (DNS-rebinding mitigation). Comma-separated, no port; use bracketed IPv6:
+# Environment=ALLOWED_HOSTS=openhab-pi,192.168.1.10
 EnvironmentFile=-/etc/default/openhab-log-viewer
 ExecStart=/usr/bin/node dist/server/index.cjs
 Restart=always

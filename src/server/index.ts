@@ -7,6 +7,7 @@ import { SourceStatus } from './types.js';
 import { LogLineParser } from './logLineParser.js';
 import { LogTailer } from './logTailer.js';
 import { createApiRouter } from './routes.js';
+import { createHostValidator } from './hostValidation.js';
 import { createShutdown } from './shutdown.js';
 import { SseHub } from './sseHub.js';
 import { createSeededLinePusher } from './startupSeed.js';
@@ -42,6 +43,12 @@ async function main(): Promise<void> {
   const app = express();
   app.disable('x-powered-by');
   app.use(securityHeaders);
+  // When ALLOWED_HOSTS is set, validate the Host header before any route runs
+  // (DNS-rebinding mitigation, see issue #132). Off by default: an empty list
+  // registers no middleware, preserving current behavior.
+  if (config.allowedHosts.length > 0) {
+    app.use(createHostValidator(config.allowedHosts));
+  }
   // Off by default so direct deployments do not trust spoofable X-Forwarded-For
   // headers. Set TRUST_PROXY (e.g. 1 for a single proxy hop) when running behind
   // a reverse proxy so rate limiting keys on the real client IP.

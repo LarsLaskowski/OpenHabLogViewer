@@ -30,12 +30,15 @@ Live web UI for `events.log` and `openhab.log` built with Node.js, Express, and 
 | `POLL_INTERVAL_MS` | `1000` | Interval in milliseconds between file polls for each log source. Lower it for faster live updates on high-volume deployments, raise it to reduce wakeups on low-volume ones. Clamped to the range `100`–`5000`. |
 | `TRUST_PROXY` | `false` | Express `trust proxy` setting. Leave off for direct deployments. Set to the number of proxy hops (e.g. `1`) when running behind a reverse proxy so rate limiting keys on the real client IP. Also accepts `true`, a preset (`loopback`), or a comma-separated list of IPs/subnets. |
 | `HEALTH_DETAILS` | `false` | When off, `/api/health` returns only `{ "status": "ok" }`. Set to `true` to include host details (pid, uptime, per-source states, SSE client counts) for local monitoring. Keep it off when the endpoint is reachable through a reverse proxy, so those details are not exposed. |
+| `ALLOWED_HOSTS` | *(unset)* | Comma-separated allowlist of host names / addresses the app may be reached under, e.g. `openhab-pi,openhab-pi.local,192.168.1.10,localhost`. When set, requests whose `Host` header is not on the list get `403 Forbidden host`. Entries are matched case-insensitively and the port is ignored (list hosts without a port; list an IPv6 address in bracketed form, e.g. `[::1]`). Unset → validation is off (default). |
 
 `EVENTS_LOG_PATH` and `OPENHAB_LOG_PATH` take precedence over `OPENHAB_LOG_DIR`.
 
 Per-IP limiting keys on the client IP as seen by the app. Behind a reverse proxy, set `TRUST_PROXY` (see [#65](https://github.com/LarsLaskowski/OpenHabLogViewer/issues/65)) so the real client IP is used instead of the proxy's.
 
 When the app runs behind a reverse proxy (Nginx, Caddy, Traefik), set `TRUST_PROXY` so the proxy's `X-Forwarded-For` header is honored. Without it, rate limiting keys every request on the proxy's IP, letting clients exhaust each other's request budget. Keep it **off** for direct deployments, otherwise clients can spoof their IP via `X-Forwarded-For`.
+
+The app has no built-in authentication and relies on the browser's same-origin policy, which [DNS rebinding](https://en.wikipedia.org/wiki/DNS_rebinding) can bypass. Setting `ALLOWED_HOSTS` to the host names you actually use to reach the viewer closes that gap: a rebinding request still carries the attacker's `Host` header, which the allowlist rejects with `403`. This is a hardening measure, not authentication — for real access control, put the app behind an authenticating reverse proxy.
 
 ## Development and build
 
@@ -217,6 +220,8 @@ MAX_SSE_CLIENTS=10
 MAX_SSE_CLIENTS_PER_IP=3
 # Set to the number of proxy hops when running behind a reverse proxy:
 # TRUST_PROXY=1
+# Restrict which Host headers are accepted (DNS-rebinding mitigation):
+# ALLOWED_HOSTS=openhab-pi,192.168.1.10
 ```
 
 See the [Configuration](#configuration) table for every available variable. Apply changes with:

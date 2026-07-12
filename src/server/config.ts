@@ -66,6 +66,19 @@ function parseBooleanFlag(name: string, fallback: boolean): boolean {
   return fallback;
 }
 
+function parseAllowedHosts(name: string): string[] {
+  const rawValue = process.env[name]?.trim();
+  if (!rawValue) {
+    // Unset/empty: Host-header validation stays off (no breaking change).
+    return [];
+  }
+
+  return rawValue
+    .split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter((entry) => entry.length > 0);
+}
+
 function parseTrustProxy(name: string): boolean | number | string {
   const rawValue = process.env[name]?.trim();
   if (!rawValue) {
@@ -114,6 +127,11 @@ export function loadConfig(): AppConfig {
     // local monitoring but leaks host details when the endpoint is reachable
     // through a reverse proxy, so it is opt-in.
     healthDetails: parseBooleanFlag('HEALTH_DETAILS', false),
+    // Off by default (empty list). When set to a comma-separated list of host
+    // names/addresses, requests whose Host header is not on the list are
+    // rejected — a mitigation against DNS rebinding for this unauthenticated
+    // LAN app (see issue #132).
+    allowedHosts: parseAllowedHosts('ALLOWED_HOSTS'),
     sources: [
       resolveSourceConfig('events', process.env.EVENTS_LOG_PATH, logDir, 'events.log'),
       resolveSourceConfig('openhab', process.env.OPENHAB_LOG_PATH, logDir, 'openhab.log')
