@@ -51,6 +51,12 @@ let hasSeenStreamOpen = false;
 // treated as half-open and force-reconnected. EventSource only fires `error`
 // on a closed socket, not on a silently stalled one.
 const HEARTBEAT_WATCHDOG_MS = 35_000;
+// Bound the resync fetch. Unlike the SSE stream it has no heartbeat watchdog, so
+// a silently stalled TCP connection (Wi-Fi drop, proxy hiccup, half-open socket)
+// would otherwise leave the promise pending forever — freezing live rendering
+// and growing the queued-line buffer without bound. On timeout the fetch rejects
+// with a TimeoutError, which flows into the existing resync .catch path.
+const RESYNC_TIMEOUT_MS = 10_000;
 let activeStream: EventSource | null = null;
 let heartbeatWatchdogHandle: ReturnType<typeof globalThis.setTimeout> | null = null;
 let hiddenSinceMs: number | null = document.visibilityState === 'hidden' ? performance.now() : null;
@@ -689,6 +695,15 @@ function queueLiveLineDuringResync(line: LogLine): boolean {
   }
 
   syncState.queuedLiveLines.push(line);
+  // Bound the queue so a hung/slow resync cannot grow it without limit. The
+  // render buffer holds at most getEffectiveClientLimit() lines, so anything
+  // older than the newest `cap` entries would be evicted right after flushing
+  // anyway. Drop from the front: the dedupe above reads the newest entry via
+  // `.at(-1)` and flushQueuedLiveLines() dedupes by id, so this stays correct.
+  const cap = getEffectiveClientLimit();
+  if (syncState.queuedLiveLines.length > cap) {
+    syncState.queuedLiveLines.splice(0, syncState.queuedLiveLines.length - cap);
+  }
   return true;
 }
 
@@ -1056,7 +1071,9 @@ async function resyncFromServer(reason: StreamResyncReason): Promise<void> {
     }
   };
   const resyncPromise = (async () => {
-    const response = await fetch(createResyncUrl(afterId, limit));
+    const response = await fetch(createResyncUrl(afterId, limit), {
+      signal: AbortSignal.timeout(RESYNC_TIMEOUT_MS)
+    });
     if (!response.ok) {
       throw new Error(`Resync failed with status ${response.status}.`);
     }
@@ -1169,7 +1186,10 @@ export const __testables = {
   state,
   syncState,
   applyResyncPayload,
-  appendBufferedLine
+  appendBufferedLine,
+  queueLiveLineDuringResync,
+  resyncFromServer,
+  getEffectiveClientLimit
 };
 
 function skipResyncPayloadAfterClear(payload: ResyncResponse): { appendedCount: number; renderReason: string | null; statusesApplied: boolean } {

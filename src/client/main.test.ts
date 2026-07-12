@@ -91,4 +91,64 @@ describe('main module', () => {
     assert.equal(appendBufferedLine(makeLine(4)), true);
     assert.deepEqual(state.lines.map((l) => l.id), [1, 2, 3, 4]);
   });
+
+  it('caps the resync queue at the effective client limit, keeping the newest lines (issue #133)', () => {
+    const { state, syncState, queueLiveLineDuringResync, getEffectiveClientLimit } = __testables;
+
+    state.clientMaxRenderedLines = 5;
+    syncState.lastSeenLineId = 0;
+    syncState.queuedLiveLines = [];
+
+    const cap = getEffectiveClientLimit();
+    assert.equal(cap, 5);
+
+    for (let id = 1; id <= 20; id += 1) {
+      assert.equal(queueLiveLineDuringResync(makeLine(id)), true);
+      assert.ok(
+        syncState.queuedLiveLines.length <= cap,
+        `queue grew past the cap at id ${id}: ${syncState.queuedLiveLines.length}`
+      );
+    }
+
+    // Only the newest `cap` lines survive; the front (oldest) ones were dropped.
+    assert.deepEqual(syncState.queuedLiveLines.map((l) => l.id), [16, 17, 18, 19, 20]);
+  });
+
+  it('recovers from a hung resync fetch that times out (issue #133)', async () => {
+    const { state, syncState, resyncFromServer } = __testables;
+
+    // Fresh state: two lines arrived and were queued while the resync is pending.
+    state.lines = [];
+    state.paused = true; // keep the post-catch render path minimal in jsdom
+    syncState.lastSeenLineId = 3;
+    syncState.resyncPromise = null;
+    syncState.pendingResyncAfterOpen = true;
+    syncState.queuedLiveLines = [makeLine(4), makeLine(5)];
+
+    const realFetch = globalThis.fetch;
+    let capturedSignal: unknown = null;
+    globalThis.fetch = ((_input: unknown, init?: { signal?: AbortSignal }) => {
+      capturedSignal = init?.signal ?? null;
+      // Simulate the timeout outcome: AbortSignal.timeout rejects the fetch with
+      // a TimeoutError DOMException once the deadline passes.
+      return Promise.reject(new DOMException('The operation timed out', 'TimeoutError'));
+    }) as typeof fetch;
+
+    try {
+      await resyncFromServer('reconnect');
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+
+    // The fetch was bounded by an abort signal (the timeout wiring).
+    assert.ok(capturedSignal instanceof AbortSignal, 'expected the resync fetch to receive an AbortSignal');
+    // The pending promise is cleared so a new resync can start again.
+    assert.equal(syncState.resyncPromise, null);
+    // A retry is re-armed for the next stream open.
+    assert.equal(syncState.pendingResyncAfterOpen, true);
+    // The queued lines were flushed into the buffer, not lost or stuck.
+    assert.equal(syncState.queuedLiveLines.length, 0);
+    assert.deepEqual(state.lines.map((l) => l.id), [4, 5]);
+    assert.equal(syncState.lastSeenLineId, 5);
+  });
 });
