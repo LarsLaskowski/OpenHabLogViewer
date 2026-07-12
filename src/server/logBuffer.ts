@@ -56,7 +56,7 @@ export class LogBuffer {
     return result;
   }
 
-  getItemsAfterId(afterId: number): LogLine[] {
+  getItemsAfterId(afterId: number, maxItems?: number): LogLine[] {
     if (this.size === 0) {
       return [];
     }
@@ -64,9 +64,16 @@ export class LogBuffer {
     // Ids are strictly monotonic and contiguous within the buffer, so the start
     // offset can be computed directly instead of scanning (O(1) vs O(n)).
     const oldestId = this.storage[this.head].id;
-    const start = Math.max(0, afterId - oldestId + 1);
+    let start = Math.max(0, afterId - oldestId + 1);
     if (start >= this.size) {
       return [];
+    }
+
+    // Optional cap: never copy more than the newest `maxItems` lines after the
+    // cursor, so a caller that only needs a bounded slice cannot trigger an
+    // unbounded materialization of the whole buffer.
+    if (maxItems !== undefined && maxItems >= 0) {
+      start = Math.max(start, this.size - maxItems);
     }
 
     const count = this.size - start;

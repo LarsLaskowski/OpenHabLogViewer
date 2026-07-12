@@ -79,14 +79,7 @@ export function createApiRouter(dependencies: RouteDependencies): Router {
       return;
     }
 
-    const snapshotLines = dependencies.buffer.getItems(limit);
     const snapshotRange = dependencies.buffer.getRange();
-    const snapshotCursor = createSyncCursor(
-      dependencies.buffer,
-      snapshotLines,
-      limit,
-      snapshotRange.totalLines > snapshotLines.length
-    );
     // A cursor strictly greater than the newest buffered id cannot come from
     // the current server life: LogBuffer ids restart at 1 on every server
     // start, so a client that outlived a restart still holds a large stale id.
@@ -96,28 +89,43 @@ export function createApiRouter(dependencies: RouteDependencies): Router {
     const cursorAhead = afterId > (snapshotRange.newestId ?? 0);
     const gapDetected =
       cursorAhead ||
-      (snapshotCursor.oldestAvailableId !== null && afterId < snapshotCursor.oldestAvailableId - 1);
-    const linesAfterCursor = gapDetected ? [] : dependencies.buffer.getItemsAfterId(afterId);
+      (snapshotRange.oldestId !== null && afterId < snapshotRange.oldestId - 1);
+
+    // Ids are strictly monotonic and contiguous within the buffer, so the number
+    // of lines after the cursor is pure arithmetic — decide the mode before
+    // materializing anything. `oldestId - 1` is the effective floor because a
+    // cursor behind the oldest buffered id already triggers `gapDetected` above
+    // and takes the reset path, so this expression is only consulted when
+    // afterId >= oldestId - 1.
+    const availableAfterCursor =
+      snapshotRange.newestId === null || snapshotRange.oldestId === null
+        ? 0
+        : Math.max(0, snapshotRange.newestId - Math.max(afterId, snapshotRange.oldestId - 1));
+    const limitExceeded = !gapDetected && availableAfterCursor > limit;
 
     let mode: ResyncResponse['mode'] = 'append';
     let resetReason: ResyncResetReason = null;
-    let lines = linesAfterCursor;
+    let lines: BootstrapResponse['lines'];
+    let truncated: boolean;
 
-    if (gapDetected) {
+    if (gapDetected || limitExceeded) {
       mode = 'reset';
-      resetReason = 'cursor-not-available';
-      lines = snapshotLines;
-    } else if (linesAfterCursor.length > limit) {
-      mode = 'reset';
-      resetReason = 'limit-exceeded';
-      lines = snapshotLines;
+      resetReason = gapDetected ? 'cursor-not-available' : 'limit-exceeded';
+      // Only materialize the snapshot on the reset path — a plain append never
+      // needs it. Bounded to `limit` (<= serverMaxSyncLines) by construction.
+      lines = dependencies.buffer.getItems(limit);
+      truncated = snapshotRange.totalLines > lines.length;
+    } else {
+      // Append path: `availableAfterCursor <= limit`, so this copy is bounded.
+      // The explicit `limit` cap is belt-and-braces against future regressions.
+      lines = dependencies.buffer.getItemsAfterId(afterId, limit);
+      truncated = false;
     }
 
     const cursor: ResyncResponse['cursor'] = {
-      ...createSyncCursor(dependencies.buffer, lines, limit, mode === 'reset' ? snapshotCursor.truncated : false),
+      ...createSyncCursor(dependencies.buffer, lines, limit, truncated),
       requestedAfterId: afterId,
-      lastIncludedId:
-        lines.at(-1)?.id ?? (mode === 'append' ? afterId : snapshotCursor.lastIncludedId)
+      lastIncludedId: lines.at(-1)?.id ?? (mode === 'append' ? afterId : null)
     };
 
     response.json({
