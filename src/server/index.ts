@@ -135,4 +135,11 @@ async function run(): Promise<void> {
   }
 }
 
+// Safety net only: I/O errors in the fire-and-forget LogTailer.sync() calls
+// are handled locally in the tailer. Anything that still slips through is
+// logged instead of terminating the process (Node's default behavior).
+process.on('unhandledRejection', (reason) => {
+  console.error('[process] Unhandled promise rejection:', reason);
+});
+
 void run(); // NOSONAR -- top-level await is unavailable in the CommonJS server bundle

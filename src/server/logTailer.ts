@@ -93,13 +93,22 @@ export class LogTailer {
       return [];
     }
 
-    const { lines, size } = await readLastLines(this.sourceConfig.filePath, this.initialLinesPerFile);
-    this.offset = size;
-    this.currentFileKey = toFileKey(fileStats);
-    this.hasLoadedInitialLines = true;
-    this.emitStatus('watching', `Watching ${this.sourceConfig.fileName}`);
+    try {
+      const { lines, size } = await readLastLines(this.sourceConfig.filePath, this.initialLinesPerFile);
+      this.offset = size;
+      this.currentFileKey = toFileKey(fileStats);
+      this.hasLoadedInitialLines = true;
+      this.emitStatus('watching', `Watching ${this.sourceConfig.fileName}`);
 
-    return lines.map((line) => this.parser.parse(this.sourceConfig, line));
+      return lines.map((line) => this.parser.parse(this.sourceConfig, line));
+    } catch (error) {
+      // The file can disappear between the successful stat() and the open()
+      // inside readLastLines (e.g. logrotate renaming it away). Report the
+      // failure instead of rejecting start(); `hasLoadedInitialLines` stays
+      // false so the next sync() cycle retries via handleInitialLoad().
+      this.handleSyncError(error);
+      return [];
+    }
   }
 
   private startWatchingDirectory(): void {
@@ -216,6 +225,13 @@ export class LogTailer {
         this.emitStatus('watching', `Watching ${this.sourceConfig.fileName}`);
         this.onLines(completedLines.map((line) => this.parser.parse(this.sourceConfig, line)));
       }
+    } catch (error) {
+      // Every caller invokes sync() fire-and-forget (poll timer, fs.watch
+      // callback, queued re-run below), so a rejection escaping here would be
+      // an unhandled promise rejection and terminate the process. This mainly
+      // catches I/O errors from the by-path open() calls after a successful
+      // stat(), e.g. when logrotate renames the file away in between.
+      this.handleSyncError(error);
     } finally {
       this.syncInFlight = false;
       if (this.syncQueued) {
@@ -261,26 +277,33 @@ export class LogTailer {
     try {
       return await stat(this.sourceConfig.filePath);
     } catch (error) {
-      const code = error instanceof Error && 'code' in error ? String(error.code) : 'UNKNOWN';
-
-      if (code === 'ENOENT') {
-        this.offset = 0;
-        this.currentFileKey = null;
-        this.resetPartialLine();
-        console.log(`[tailer] ${this.sourceConfig.filePath}: ENOENT`);
-        this.emitStatus('missing', `File not found: ${this.sourceConfig.fileName}`);
-        return null;
-      }
-
-      if (code === 'EACCES' || code === 'EPERM') {
-        console.log(`[tailer] ${this.sourceConfig.filePath}: ${code}`);
-        this.emitStatus('permission-denied', `Permission denied: ${this.sourceConfig.fileName}`);
-        return null;
-      }
-
-      this.emitStatus('error', `Error reading ${this.sourceConfig.fileName}: ${code}`);
+      this.handleSyncError(error);
       return null;
     }
+  }
+
+  // Maps I/O errors from stat/open/read onto a source status. ENOENT resets
+  // the tailer so the next cycle re-attaches via the `!this.currentFileKey`
+  // branch in sync() once the file is back.
+  private handleSyncError(error: unknown): void {
+    const code = error instanceof Error && 'code' in error ? String(error.code) : 'UNKNOWN';
+
+    if (code === 'ENOENT') {
+      this.offset = 0;
+      this.currentFileKey = null;
+      this.resetPartialLine();
+      console.log(`[tailer] ${this.sourceConfig.filePath}: ENOENT`);
+      this.emitStatus('missing', `File not found: ${this.sourceConfig.fileName}`);
+      return;
+    }
+
+    if (code === 'EACCES' || code === 'EPERM') {
+      console.log(`[tailer] ${this.sourceConfig.filePath}: ${code}`);
+      this.emitStatus('permission-denied', `Permission denied: ${this.sourceConfig.fileName}`);
+      return;
+    }
+
+    this.emitStatus('error', `Error reading ${this.sourceConfig.fileName}: ${code}`);
   }
 
   private emitStatus(state: SourceState, message: string): void {

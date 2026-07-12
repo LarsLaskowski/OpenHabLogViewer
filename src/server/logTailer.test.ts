@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, renameSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { LogTailer } from './logTailer.js';
@@ -36,6 +36,23 @@ function makeHarness(fileName = 'events.log', initialLinesPerFile = 500): Harnes
 async function cleanup(h: Harness): Promise<void> {
   await h.tailer.stop();
   rmSync(h.dir, { recursive: true, force: true });
+}
+
+// Collects unhandled promise rejections while a test runs. Registering the
+// listener also disables Node's default crash-on-rejection behavior, so the
+// test can assert on the collected rejections instead of dying.
+function captureUnhandledRejections(): { rejections: unknown[]; dispose: () => void } {
+  const rejections: unknown[] = [];
+  const listener = (reason: unknown): void => {
+    rejections.push(reason);
+  };
+  process.on('unhandledRejection', listener);
+  return {
+    rejections,
+    dispose: () => {
+      process.off('unhandledRejection', listener);
+    }
+  };
 }
 
 describe('LogTailer', () => {
@@ -147,6 +164,103 @@ describe('LogTailer', () => {
         `expected an intact line, got: ${JSON.stringify(h.lines.map((l) => l.rawLine))}`
       );
     } finally {
+      await cleanup(h);
+    }
+  });
+
+  it('survives a post-stat open() failure while tailing and recovers (issue #129)', async () => {
+    const h = makeHarness();
+    const capture = captureUnhandledRejections();
+    try {
+      writeFileSync(h.filePath, 'first\n');
+      await h.tailer.start();
+
+      // Force the exact failure mode of the stat→open race deterministically:
+      // replace the log file with a directory of the same name. stat() keeps
+      // succeeding, but the by-path open() inside sync() then rejects
+      // (EISDIR), just like ENOENT when logrotate renames the file away
+      // between the two calls.
+      rmSync(h.filePath);
+      mkdirSync(h.filePath);
+      await delay(200);
+      assert.ok(
+        h.statuses.some((s) => s.state === 'error' || s.state === 'missing'),
+        `expected an error/missing status, got: ${JSON.stringify(h.statuses.map((s) => s.state))}`
+      );
+
+      // Once a regular file is back, the tailer must resume emitting lines.
+      // Assert on a line appended after the replacement file has been picked
+      // up: the replacement may reuse the old file's inode (common on tmpfs),
+      // in which case rotation is not detected and the first read starts at
+      // the stale offset — but appended lines must flow again either way.
+      rmSync(h.filePath, { recursive: true, force: true });
+      writeFileSync(h.filePath, 'recovered file content\n');
+      await delay(150);
+      appendFileSync(h.filePath, 'appended after recovery\n');
+      await delay(200);
+      assert.ok(
+        h.lines.some((l) => l.rawLine === 'appended after recovery'),
+        `expected the tailer to recover, got: ${JSON.stringify(h.lines.map((l) => l.rawLine))}`
+      );
+
+      assert.deepEqual(capture.rejections, []);
+    } finally {
+      capture.dispose();
+      await cleanup(h);
+    }
+  });
+
+  it('resolves start() with no lines when the post-stat read fails, then self-heals (issue #129)', async () => {
+    const h = makeHarness();
+    const capture = captureUnhandledRejections();
+    try {
+      // A directory at the log path makes stat() succeed while the open()
+      // inside readLastLines rejects — the startup variant of the race.
+      mkdirSync(h.filePath);
+      const initial = await h.tailer.start();
+      assert.deepEqual(initial, []);
+      assert.ok(h.statuses.some((s) => s.state === 'error'));
+
+      // The initial load is retried by the next sync cycles, so the tailer
+      // starts emitting lines once a regular file appears.
+      rmSync(h.filePath, { recursive: true, force: true });
+      writeFileSync(h.filePath, 'after startup failure\n');
+      await delay(200);
+      assert.ok(
+        h.lines.some((l) => l.rawLine === 'after startup failure'),
+        `expected the tailer to self-heal, got: ${JSON.stringify(h.lines.map((l) => l.rawLine))}`
+      );
+      assert.ok(h.statuses.some((s) => s.state === 'watching'));
+
+      assert.deepEqual(capture.rejections, []);
+    } finally {
+      capture.dispose();
+      await cleanup(h);
+    }
+  });
+
+  it('maps ENOENT thrown after a successful stat to a missing status and reattaches (issue #129)', async () => {
+    const h = makeHarness();
+    const capture = captureUnhandledRejections();
+    try {
+      writeFileSync(h.filePath, 'before\n');
+      await h.tailer.start();
+
+      // Drive the error handler directly with the rejection produced when the
+      // file vanishes between stat() and open(): the tailer must report the
+      // file as missing and reset so the next sync re-attaches.
+      const enoent = Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' });
+      (h.tailer as unknown as { handleSyncError(error: unknown): void }).handleSyncError(enoent);
+      assert.equal(h.statuses.at(-1)?.state, 'missing');
+
+      appendFileSync(h.filePath, 'still here\n');
+      await delay(200);
+      assert.ok(h.statuses.some((s) => s.message.startsWith('Reattached')));
+      assert.ok(h.lines.some((l) => l.rawLine === 'still here'));
+
+      assert.deepEqual(capture.rejections, []);
+    } finally {
+      capture.dispose();
       await cleanup(h);
     }
   });
