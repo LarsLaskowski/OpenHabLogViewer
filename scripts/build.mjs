@@ -21,7 +21,7 @@ await build({
   bundle: true,
   platform: 'node',
   format: 'cjs',
-  target: 'node20',
+  target: 'node22',
   sourcemap: true,
   logLevel: 'info'
 });
