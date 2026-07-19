@@ -143,7 +143,7 @@ This section is a complete walkthrough for running the viewer as a background se
 ### Prerequisites
 
 - A Linux host with **systemd** (the default on Debian, Ubuntu, Raspberry Pi OS, Fedora, etc.).
-- **Node.js 20 or newer** installed on the target host. Check with `node --version`. Because the server is bundled into a single `dist/server/index.cjs` file, this is the only runtime dependency — you do **not** need to run `npm install` on the target host.
+- **Node.js 22 or newer** installed on the target host. Check with `node --version`. Because the server is bundled into a single `dist/server/index.cjs` file, this is the only runtime dependency — you do **not** need to run `npm install` on the target host.
 - The `openhab` user. On a standard openHAB installation it already exists and owns the log files. If it does not exist, create a dedicated service user:
 
   ```bash

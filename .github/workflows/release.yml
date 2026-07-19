@@ -71,10 +71,13 @@ jobs:
           ref: ${{ steps.tag.outputs.tag }}
           fetch-depth: 0 # full history needed for generated release notes
 
+      # Building the release with the oldest supported Node.js version (22)
+      # keeps the bundle's esbuild target maximally conservative, so the same
+      # single artifact stays compatible with Node.js 22, 24, and 26 hosts.
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
