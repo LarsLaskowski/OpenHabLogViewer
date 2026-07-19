@@ -42,3 +42,7 @@ temp/
 
 # Local Claude Code settings (machine-specific paths)
 .claude/settings.local.json
+.codex/hooks.json
+.codex/hooks/sonar-secrets/build-scripts/pretool-secrets.ps1
+.codex/hooks/sonar-secrets/build-scripts/prompt-secrets.ps1
+.codex/config.toml
