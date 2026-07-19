@@ -71,6 +71,18 @@ jobs:
           ref: ${{ steps.tag.outputs.tag }}
           fetch-depth: 0 # full history needed for generated release notes
 
+      # Building the release with the oldest supported Node.js version (22)
+      # keeps the bundle's esbuild target maximally conservative, so the same
+      # single artifact stays compatible with Node.js 22, 24, and 26 hosts.
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Align package.json to tag version
         run: |
           set -euo pipefail
@@ -80,53 +92,13 @@ jobs:
           npm version "${{ steps.tag.outputs.version }}" \
             --no-git-tag-version --allow-same-version
 
-      # Building and packaging once per supported Node.js version validates the
-      # build against each supported runtime and gives users a per-version
-      # asset to download. ESBUILD_SERVER_TARGET is set to match, so each
-      # package's bundle is targeted at the Node.js version it was built for.
-      - name: Setup Node.js 24
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Install dependencies (Node.js 24)
-        run: npm ci
-
-      - name: Build (Node.js 24)
+      - name: Build
         run: npm run build
-        env:
-          ESBUILD_SERVER_TARGET: node24
 
-      - name: Package build output (Node.js 24)
+      - name: Package build output
         run: |
           set -euo pipefail
-          PKG_NAME="openhab-log-viewer-${{ steps.tag.outputs.tag }}-node24"
-          mkdir -p "release/${PKG_NAME}"
-          cp -r dist "release/${PKG_NAME}/dist"
-          cp -r deploy "release/${PKG_NAME}/deploy"
-          cp "${GITHUB_WORKSPACE}/package.json" README.md "release/${PKG_NAME}/"
-          tar -czf "${PKG_NAME}.tar.gz" -C release "${PKG_NAME}"
-          (cd release && zip -r "../${PKG_NAME}.zip" "${PKG_NAME}")
-
-      - name: Setup Node.js 26
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 26
-          cache: npm
-
-      - name: Install dependencies (Node.js 26)
-        run: npm ci
-
-      - name: Build (Node.js 26)
-        run: npm run build
-        env:
-          ESBUILD_SERVER_TARGET: node26
-
-      - name: Package build output (Node.js 26)
-        run: |
-          set -euo pipefail
-          PKG_NAME="openhab-log-viewer-${{ steps.tag.outputs.tag }}-node26"
+          PKG_NAME="openhab-log-viewer-${{ steps.tag.outputs.tag }}"
           mkdir -p "release/${PKG_NAME}"
           cp -r dist "release/${PKG_NAME}/dist"
           cp -r deploy "release/${PKG_NAME}/deploy"
@@ -141,7 +113,5 @@ jobs:
           name: ${{ steps.tag.outputs.tag }}
           generate_release_notes: true
           files: |
-            openhab-log-viewer-*-node24.tar.gz
-            openhab-log-viewer-*-node24.zip
-            openhab-log-viewer-*-node26.tar.gz
-            openhab-log-viewer-*-node26.zip
+            openhab-log-viewer-*.tar.gz
+            openhab-log-viewer-*.zip

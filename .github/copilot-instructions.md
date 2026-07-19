@@ -2,7 +2,7 @@
 
 ## Build, test, and lint commands
 
-- Use **Node.js 24+** (`package.json` enforces `node >=24`).
+- Use **Node.js 22+** (`package.json` enforces `node >=22`).
 - Install dependencies with `npm install`.
 - Run the type check with `npm run typecheck`.
 - Run the production build with `npm run build`. This already runs `npm run typecheck`, bundles `src/server/index.ts` and `src/client/main.ts` with esbuild, recreates `dist/`, and copies `index.html`, `styles.css`, and the SVG assets into `dist/client`.
