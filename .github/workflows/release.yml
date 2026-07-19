@@ -80,11 +80,10 @@ jobs:
           npm version "${{ steps.tag.outputs.version }}" \
             --no-git-tag-version --allow-same-version
 
-      # The app is bundled into a single dependency-free dist/server/index.cjs, so
-      # the two builds below produce functionally identical output regardless of
-      # which Node.js version built them. Building and packaging once per
-      # supported Node.js version still validates the build against each
-      # supported runtime and gives users a per-version asset to download.
+      # Building and packaging once per supported Node.js version validates the
+      # build against each supported runtime and gives users a per-version
+      # asset to download. ESBUILD_SERVER_TARGET is set to match, so each
+      # package's bundle is targeted at the Node.js version it was built for.
       - name: Setup Node.js 24
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -96,6 +95,8 @@ jobs:
 
       - name: Build (Node.js 24)
         run: npm run build
+        env:
+          ESBUILD_SERVER_TARGET: node24
 
       - name: Package build output (Node.js 24)
         run: |
@@ -119,6 +120,8 @@ jobs:
 
       - name: Build (Node.js 26)
         run: npm run build
+        env:
+          ESBUILD_SERVER_TARGET: node26
 
       - name: Package build output (Node.js 26)
         run: |

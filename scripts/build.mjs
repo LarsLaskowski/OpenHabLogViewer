@@ -9,6 +9,7 @@ const clientDistDir = path.join(distDir, 'client');
 const serverDistDir = path.join(distDir, 'server');
 const clientAssetsDir = path.join(clientDistDir, 'assets');
 const packageJson = JSON.parse(await readFile(path.join(rootDir, 'package.json'), 'utf8'));
+const serverTarget = process.env.ESBUILD_SERVER_TARGET ?? 'node24';
 
 await rm(distDir, { recursive: true, force: true });
 await mkdir(clientDistDir, { recursive: true });
@@ -21,7 +22,7 @@ await build({
   bundle: true,
   platform: 'node',
   format: 'cjs',
-  target: 'node24',
+  target: serverTarget,
   sourcemap: true,
   logLevel: 'info'
 });
