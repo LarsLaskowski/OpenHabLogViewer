@@ -6,6 +6,19 @@ import { Response } from 'express';
 // bound until the OOM killer triggers. Dropping the client bounds the cost.
 const MAX_CLIENT_BUFFER_BYTES = 1024 * 1024;
 
+// Flush a batch broadcast once the pending payload reaches this size instead of
+// writing the whole batch at once. A sync cycle can carry up to
+// MAX_SYNC_DELTA_BYTES of log, so a single write would hand a stalled client
+// several megabytes before the next back-pressure check and make
+// MAX_CLIENT_BUFFER_BYTES a per-cycle floor rather than a ceiling. Chunking
+// still collapses tens of thousands of per-line writes into a few dozen.
+// Measured in UTF-16 characters, which tracks bytes closely for log text.
+const WRITE_CHUNK_CHARS = 256 * 1024;
+
+function formatEvent(event: string, data: unknown): string {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
 interface SseClient {
   id: number;
   ip: string;
@@ -55,8 +68,32 @@ export class SseHub {
   }
 
   broadcast(event: string, data: unknown): void {
-    const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    this.writeToAll(formatEvent(event, data));
+  }
 
+  // A log burst can produce tens of thousands of lines in one tailer cycle.
+  // Concatenated SSE frames are byte-identical to the same frames written
+  // separately, so grouping them into chunked writes keeps the per-write
+  // bookkeeping off the event loop without changing what clients see. Frames
+  // are appended to a rolling chunk rather than collected in an array so the
+  // whole batch is never materialized twice.
+  broadcastBatch(event: string, items: unknown[]): void {
+    let chunk = '';
+
+    for (const item of items) {
+      chunk += formatEvent(event, item);
+      if (chunk.length >= WRITE_CHUNK_CHARS) {
+        this.writeToAll(chunk);
+        chunk = '';
+      }
+    }
+
+    if (chunk.length > 0) {
+      this.writeToAll(chunk);
+    }
+  }
+
+  private writeToAll(payload: string): void {
     for (const [clientId, client] of this.clients) {
       // A client whose socket buffer is already over the cap is not draining;
       // writing more would only grow the server heap, so drop it instead.

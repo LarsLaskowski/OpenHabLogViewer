@@ -1,8 +1,8 @@
 import { LogBuffer } from './logBuffer.js';
-import { LogLineDraft } from './types.js';
+import { LogLine, LogLineDraft } from './types.js';
 
 interface LogLineBroadcaster {
-  broadcast(event: string, data: unknown): void;
+  broadcastBatch(event: string, items: unknown[]): void;
 }
 
 export interface SeededLinePusher {
@@ -24,10 +24,10 @@ export function createSeededLinePusher(buffer: LogBuffer, sseHub: LogLineBroadca
       return;
     }
 
-    for (const line of lines) {
-      const persisted = buffer.push(line);
-      sseHub.broadcast('log-line', persisted);
-    }
+    // Buffer the whole batch first, then broadcast it in one write: a
+    // broadcast line is always already buffered, which /api/resync relies on.
+    const persisted: LogLine[] = lines.map((line) => buffer.push(line));
+    sseHub.broadcastBatch('log-line', persisted);
   };
 
   const seedInitialLines = (lines: LogLineDraft[]): void => {
