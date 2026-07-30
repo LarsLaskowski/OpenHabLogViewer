@@ -54,6 +54,63 @@ describe('SseHub', () => {
     }
   });
 
+  it('broadcastBatch writes every item as its own SSE frame in one write', () => {
+    const hub = new SseHub(NO_HEARTBEAT, 10, 3);
+    try {
+      const res = new FakeResponse();
+      hub.addClient(asResponse(res), 'client-a');
+      res.writes.length = 0; // drop the retry preamble
+
+      hub.broadcastBatch('log-line', [{ id: 1 }, { id: 2 }, { id: 3 }]);
+
+      assert.equal(res.writes.length, 1);
+      const frames = res.writes[0].split('\n\n').filter((frame) => frame.length > 0);
+      assert.deepEqual(frames, [
+        'event: log-line\ndata: {"id":1}',
+        'event: log-line\ndata: {"id":2}',
+        'event: log-line\ndata: {"id":3}'
+      ]);
+    } finally {
+      hub.close();
+    }
+  });
+
+  it('broadcastBatch writes nothing for an empty batch', () => {
+    const hub = new SseHub(NO_HEARTBEAT, 10, 3);
+    try {
+      const res = new FakeResponse();
+      hub.addClient(asResponse(res), 'client-a');
+      res.writes.length = 0;
+
+      hub.broadcastBatch('log-line', []);
+      assert.equal(res.writes.length, 0);
+    } finally {
+      hub.close();
+    }
+  });
+
+  it('broadcastBatch drops a slow client and removes one whose write throws', () => {
+    const hub = new SseHub(NO_HEARTBEAT, 10, 3);
+    try {
+      const slow = new FakeResponse();
+      slow.writableLength = 2 * 1024 * 1024; // over the 1 MB cap
+      const broken = new FakeResponse();
+      hub.addClient(asResponse(slow), 'client-a');
+      hub.addClient(asResponse(broken), 'client-b');
+      // Only fail once the retry preamble has been written.
+      broken.write = () => {
+        throw new Error('socket closed');
+      };
+
+      hub.broadcastBatch('log-line', [{ id: 1 }, { id: 2 }]);
+
+      assert.equal(hub.clientCount, 0);
+      assert.equal(slow.writableEnded, true);
+    } finally {
+      hub.close();
+    }
+  });
+
   it('enforces global and per-IP limits', () => {
     const hub = new SseHub(NO_HEARTBEAT, 2, 1);
     try {

@@ -62,15 +62,20 @@ describe('sortInitialLines', () => {
 describe('createSeededLinePusher', () => {
   function makePusher(): {
     buffer: LogBuffer;
+    batches: LogLine[][];
     broadcasts: LogLine[];
     pusher: ReturnType<typeof createSeededLinePusher>;
   } {
     const buffer = new LogBuffer(100);
+    const batches: LogLine[][] = [];
     const broadcasts: LogLine[] = [];
     const pusher = createSeededLinePusher(buffer, {
-      broadcast: (_event, data) => broadcasts.push(data as LogLine)
+      broadcastBatch: (_event, items) => {
+        batches.push(items as LogLine[]);
+        broadcasts.push(...(items as LogLine[]));
+      }
     });
-    return { buffer, broadcasts, pusher };
+    return { buffer, batches, broadcasts, pusher };
   }
 
   it('queues live lines that arrive before the seed and sorts them into it', () => {
@@ -94,7 +99,7 @@ describe('createSeededLinePusher', () => {
   });
 
   it('pushes and broadcasts live lines directly once seeded', () => {
-    const { buffer, broadcasts, pusher } = makePusher();
+    const { buffer, batches, broadcasts, pusher } = makePusher();
 
     pusher.seedInitialLines([]);
     pusher.pushLiveLines([draft({ rawLine: 'live-1' }), draft({ rawLine: 'live-2' })]);
@@ -102,5 +107,9 @@ describe('createSeededLinePusher', () => {
     assert.deepEqual(buffer.getItems().map((line) => line.rawLine), ['live-1', 'live-2']);
     assert.deepEqual(broadcasts.map((line) => line.rawLine), ['live-1', 'live-2']);
     assert.equal(broadcasts[0].id, 1);
+
+    // One batch emission carrying both persisted lines with their assigned ids.
+    assert.equal(batches.length, 1);
+    assert.deepEqual(batches[0].map((line) => line.id), [1, 2]);
   });
 });

@@ -6,6 +6,10 @@ import { Response } from 'express';
 // bound until the OOM killer triggers. Dropping the client bounds the cost.
 const MAX_CLIENT_BUFFER_BYTES = 1024 * 1024;
 
+function formatEvent(event: string, data: unknown): string {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
 interface SseClient {
   id: number;
   ip: string;
@@ -55,8 +59,22 @@ export class SseHub {
   }
 
   broadcast(event: string, data: unknown): void {
-    const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    this.writeToAll(formatEvent(event, data));
+  }
 
+  // A log burst can produce tens of thousands of lines in one tailer cycle.
+  // Concatenated SSE frames are byte-identical to the same frames written
+  // separately, so batching them into a single write per client keeps the
+  // per-write bookkeeping off the event loop without changing what clients see.
+  broadcastBatch(event: string, items: unknown[]): void {
+    if (items.length === 0) {
+      return;
+    }
+
+    this.writeToAll(items.map((item) => formatEvent(event, item)).join(''));
+  }
+
+  private writeToAll(payload: string): void {
     for (const [clientId, client] of this.clients) {
       // A client whose socket buffer is already over the cap is not draining;
       // writing more would only grow the server heap, so drop it instead.
