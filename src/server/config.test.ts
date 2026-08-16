@@ -7,6 +7,7 @@ import { loadConfig } from './config.js';
 
 const CONFIG_ENV_KEYS = [
   'PORT',
+  'BIND_ADDRESS',
   'INITIAL_LINES_PER_FILE',
   'MAX_BUFFERED_LINES',
   'CLIENT_MAX_RENDERED_LINES',
@@ -45,6 +46,7 @@ describe('loadConfig defaults', () => {
   it('uses documented defaults when no env vars are set', () => {
     const config = loadConfig();
     assert.equal(config.port, 9001);
+    assert.equal(config.bindAddress, '0.0.0.0');
     assert.equal(config.initialLinesPerFile, 500);
     assert.equal(config.maxBufferedLines, 2000);
     assert.equal(config.clientMaxRenderedLines, 500);
@@ -140,6 +142,22 @@ describe('loadConfig health details parsing', () => {
 
     process.env.HEALTH_DETAILS = 'nonsense';
     assert.equal(loadConfig().healthDetails, false);
+  });
+});
+
+describe('loadConfig bind address parsing', () => {
+  it('defaults to 0.0.0.0 when unset', () => {
+    assert.equal(loadConfig().bindAddress, '0.0.0.0');
+  });
+
+  it('uses the configured address', () => {
+    process.env.BIND_ADDRESS = '127.0.0.1';
+    assert.equal(loadConfig().bindAddress, '127.0.0.1');
+  });
+
+  it('treats a whitespace-only value as unset', () => {
+    process.env.BIND_ADDRESS = '   ';
+    assert.equal(loadConfig().bindAddress, '0.0.0.0');
   });
 });
 
