@@ -2,7 +2,7 @@ import { FSWatcher, Stats, watch } from 'node:fs';
 import { dirname } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
 import { clearInterval, setInterval } from 'node:timers';
-import { open, stat } from 'node:fs/promises';
+import { open, stat, type FileHandle } from 'node:fs/promises';
 import { LogLineDraft, SourceConfig, SourceState, SourceStatus } from './types.js';
 import { LogLineParser } from './logLineParser.js';
 
@@ -204,12 +204,14 @@ export class LogTailer {
     }
 
     this.syncInFlight = true;
+    // Open first, then fstat the handle: the stats and the subsequent read
+    // are then guaranteed to describe the same file, closing the stat→open
+    // race where a by-path re-open after stat() could land on a replacement
+    // file created by a rotation between the two calls (issue #136).
+    let fileHandle: FileHandle | null = null;
     try {
-      const fileStats = await this.safeStat();
-      if (!fileStats) {
-        return;
-      }
-
+      fileHandle = await open(this.sourceConfig.filePath, 'r');
+      const fileStats = await fileHandle.stat();
       const nextFileKey = toFileKey(fileStats);
 
       if (!this.hasLoadedInitialLines) {
@@ -248,7 +250,9 @@ export class LogTailer {
         return;
       }
 
-      const nextChunk = await readRange(this.sourceConfig.filePath, this.offset, delta);
+      const buffer = Buffer.alloc(delta);
+      const { bytesRead } = await fileHandle.read(buffer, 0, delta, this.offset);
+      const nextChunk = buffer.subarray(0, bytesRead);
       this.offset = fileStats.size;
       this.currentFileKey = nextFileKey;
 
@@ -261,10 +265,13 @@ export class LogTailer {
       // Every caller invokes sync() fire-and-forget (poll timer, fs.watch
       // callback, queued re-run below), so a rejection escaping here would be
       // an unhandled promise rejection and terminate the process. This mainly
-      // catches I/O errors from the by-path open() calls after a successful
-      // stat(), e.g. when logrotate renames the file away in between.
+      // catches I/O errors from open()/fstat()/read(), e.g. when logrotate
+      // renames the file away in between polls.
       this.handleSyncError(error);
     } finally {
+      if (fileHandle) {
+        await fileHandle.close();
+      }
       this.syncInFlight = false;
       if (this.syncQueued) {
         this.syncQueued = false;
@@ -386,24 +393,6 @@ function formatBytes(bytes: number): string {
     return `${(bytes / 1024).toFixed(1)} KB`;
   }
   return `${bytes} B`;
-}
-
-// Returns the raw bytes so the caller can decode them through its persistent
-// StringDecoder; decoding each range independently here would corrupt a
-// multi-byte character that spans two ranges.
-async function readRange(filePath: string, offset: number, length: number): Promise<Buffer> {
-  if (length <= 0) {
-    return Buffer.alloc(0);
-  }
-
-  const fileHandle = await open(filePath, 'r');
-  try {
-    const buffer = Buffer.alloc(length);
-    const { bytesRead } = await fileHandle.read(buffer, 0, length, offset);
-    return buffer.subarray(0, bytesRead);
-  } finally {
-    await fileHandle.close();
-  }
 }
 
 interface TailRead {
