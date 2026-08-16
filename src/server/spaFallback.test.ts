@@ -6,6 +6,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import { createSpaFallback } from './spaFallback.js';
 
 interface AppContext {
@@ -15,6 +16,17 @@ interface AppContext {
 
 async function startApp(clientDistDir: string): Promise<AppContext> {
   const app = express();
+  // Mirror the production wiring in index.ts, where a rate limiter always sits
+  // in front of the SPA fallback's sendFile() call, so this harness does not
+  // expose an unbounded filesystem-reading handler even in tests.
+  app.use(
+    rateLimit({
+      windowMs: 60 * 1000,
+      max: 100,
+      standardHeaders: true,
+      legacyHeaders: false
+    })
+  );
   app.use(createSpaFallback(clientDistDir));
 
   const server: Server = app.listen(0);
