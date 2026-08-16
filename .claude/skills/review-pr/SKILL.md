@@ -29,9 +29,10 @@ Write all output in **English**: your summary to the user, your recommendations,
 Evaluate the change against what matters for this project. Focus on:
 
 - **Correctness** — bugs, edge cases, error handling, race conditions, off-by-one and boundary issues. For this app pay attention to log tailing/rotation/truncation logic, SSE streaming, and reconnect/resync behavior.
-- **Convention adherence** (`CLAUDE.md`) — every physical log line stays its own UI row; frontend stays framework-free; shared payload changes update both `src/server/types.ts` and `src/client/state.ts`; new client defaults go through `createInitialState()`; user-facing text and comments are in English; file/source error and reconnect states stay visible.
+- **Convention adherence** (`CLAUDE.md`, `docs/ARCHITECTURE.md`) — every physical log line stays its own UI row; frontend stays framework-free; shared payload changes update both `src/server/types.ts` and `src/client/state.ts`; new client defaults go through `createInitialState()`; user-facing text and comments are in English; file/source error and reconnect states stay visible.
 - **Scope and size** — unrelated changes bundled in, accidental file inclusions, debug leftovers.
-- **Tests and validation** — whether the change is verifiable and whether `npm run typecheck` / `npm run build` would plausibly pass.
+- **Test coverage** (`docs/UNIT_TESTS.md`) — new or changed behavior in `src/server`/`src/client` should have a matching colocated `*.test.ts`; a bug fix should have a regression test. Flag missing tests as a **Blocking** finding, not a Nit, unless the change is a pure refactor with no behavior change.
+- **Tests and validation** — whether the change is verifiable and whether `npm run typecheck` / `npm test` / `npm run build` would plausibly pass.
 - **Clarity** — naming, dead code, needless complexity, missing or misleading comments.
 
 Do not run builds that modify files unnecessarily; reading the diff and the surrounding code is usually enough. You may read any file in the repo for context.

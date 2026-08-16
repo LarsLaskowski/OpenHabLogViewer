@@ -21,9 +21,8 @@ Follow this workflow:
 7. Push the branch to `origin` and set upstream tracking.
 8. Create a pull request with GitHub CLI:
    - base branch: `main`, unless the user explicitly requests a different base
-   - title: concise summary of the change (under 70 characters)
-   - body: what changed, why, and anything a reviewer should know. Wrap the body in a HEREDOC to preserve formatting.
-   - If the repo has a PR template, follow it.
+   - title: concise summary of the change (under 70 characters), following the `[area] Description` convention from `docs/CONTRIBUTING.md`
+   - body: follow the structure in `.github/pull_request_template.md` (Description, Issues, Reviewer Notes, Test Plan, Checklist, Next Steps), including whether unit tests were added per `docs/UNIT_TESTS.md`. Wrap the body in a HEREDOC to preserve formatting.
 9. After the pull request is created, switch back to the `main` branch.
 10. Report the branch name and pull request URL. Wrap the URL in a `<pr-created>` tag on its own line so the UI can render a live status card, like this: `<pr-created>https://github.com/owner/repo/pull/123</pr-created>`
 

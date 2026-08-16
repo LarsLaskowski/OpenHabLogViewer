@@ -31,13 +31,15 @@ All user-facing output you create — branch name, commit message, PR title and 
 
 ### 4. Implement the fix
 
-- Solve the issue following the conventions in `CLAUDE.md`. In particular: keep changes small and targeted, reuse existing helpers before adding abstractions, keep the frontend framework-free, and write all comments and UI text in English.
+- Solve the issue following the conventions in `CLAUDE.md` and `docs/ARCHITECTURE.md`. In particular: keep changes small and targeted, reuse existing helpers before adding abstractions, keep the frontend framework-free, and write all comments and UI text in English.
 - When you change shared payloads, update both `src/server/types.ts` and `src/client/state.ts` (the project keeps these shapes in parallel rather than sharing a module).
 - Read the surrounding code and match its style, naming, and comment density.
+- **Write or update unit tests for the fix**, following `docs/UNIT_TESTS.md` (test stack, naming, colocated `*.test.ts` files, no mocking library). A bug fix needs a regression test that fails without the fix and passes with it — this is not optional.
 
 ### 5. Validate
 
 - Run `npm run typecheck`.
+- Run `npm test` and make sure it passes, including any test you added or updated.
 - When the change affects runtime behavior, also run `npm run build` (this re-runs the type check and bundles both server and client).
 - If validation fails, fix the cause before continuing — do not push broken code. If you cannot make it pass, stop and report clearly.
 
@@ -52,8 +54,8 @@ All user-facing output you create — branch name, commit message, PR title and 
 - Push the branch to `origin` with upstream tracking.
 - Open the pull request with GitHub CLI:
   - base branch: `main`, unless the user requested a different base
-  - title: concise English summary of the fix
-  - body: a short English summary of the problem and the fix, and a line `Closes #<number>` so the issue auto-closes on merge.
+  - title: concise English summary of the fix, following the `[area] Description` convention from `docs/CONTRIBUTING.md` (e.g. `[Tailer] Handle truncated events.log during rotation`)
+  - body: follow the structure in `.github/pull_request_template.md` (Description, Issues, Reviewer Notes, Test Plan, Checklist, Next Steps) and include a line `Closes #<number>` so the issue auto-closes on merge.
   - Do not add any attribution, "Generated with" footer, or other note referencing an AI/assistant in the PR title or body.
 
 ### 8. Finish

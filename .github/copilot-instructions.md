@@ -1,5 +1,7 @@
 # Copilot instructions for OpenHab Log Viewer
 
+For deeper context beyond this summary, see [ARCHITECTURE.md](../docs/ARCHITECTURE.md) (design and rationale), [CONTRIBUTING.md](../docs/CONTRIBUTING.md) (workflow and code style), and [UNIT_TESTS.md](../docs/UNIT_TESTS.md) (test conventions and requirements). These files are the source of truth; keep this summary consistent with them when either changes.
+
 ## Build, test, and lint commands
 
 - Use **Node.js 22+** (`package.json` enforces `node >=22`).
@@ -7,9 +9,11 @@
 - Run the type check with `npm run typecheck`.
 - Run the production build with `npm run build`. This already runs `npm run typecheck`, bundles `src/server/index.ts` and `src/client/main.ts` with esbuild, recreates `dist/`, and copies `index.html`, `styles.css`, and the SVG assets into `dist/client`.
 - Run the built app with `npm run start`.
-- Run the test suite with `npm test` (Node's built-in test runner via `tsx`, covering `src/server/*.test.ts` and `src/client/*.test.ts`); `npm run test:coverage` adds coverage. There is currently **no lint script and no single-test command** configured in this repository.
+- Run the test suite with `npm test` (Node's built-in test runner via `tsx`, covering `src/server/*.test.ts` and `src/client/*.test.ts`); `npm run test:coverage` adds coverage. There is currently **no lint script and no single-test command** configured in this repository. **Unit tests are mandatory for newly written or changed code** — see [UNIT_TESTS.md](../docs/UNIT_TESTS.md) for the required test stack, naming, and structure; a change without tests is not complete.
 
 ## High-level architecture
+
+See [ARCHITECTURE.md](../docs/ARCHITECTURE.md) for the full picture (data-flow diagram, per-module rationale, build/deployment). Summary:
 
 - This project is a lightweight openHAB log viewer for `events.log` and `openhab.log`.
 - The app is split into a small **Express server** in `src/server` and a **framework-free browser client** in `src/client`.
@@ -22,6 +26,7 @@
 
 ## Key conventions
 
+- **Write unit tests for all newly written or changed code** in `src/server`/`src/client`, per [UNIT_TESTS.md](../docs/UNIT_TESTS.md); a bug fix needs a regression test. Do not report a change as complete without matching test coverage.
 - Keep **every physical log file line as its own visible UI row**. Continuation lines must not be merged into the previous line; they stay separate rows with placeholder metadata cells.
 - Keep the frontend framework-free unless there is a strong technical reason to change it.
 - When changing shared payloads, update both `src/server/types.ts` and `src/client/state.ts`. The client and server maintain matching `LogLine`, `SourceStatus`, and `BootstrapResponse` shapes in parallel rather than importing a common shared-types module.
@@ -43,6 +48,7 @@
 - Always write pull request titles and descriptions in **English**, regardless of the language used in the request or the conversation.
 - Never mention Claude, Anthropic, Claude Code, Copilot, or any other AI/assistant tooling in a pull request title or description. Do not add `Co-Authored-By` trailers, "Generated with" footers, session links, or any other note attributing the work to an AI.
 - This applies to every PR created for this repository, whether opened directly or through a skill.
+- Follow [CONTRIBUTING.md](../docs/CONTRIBUTING.md) for branch naming (`[area] Description`), the rebase-not-merge policy, and the checklist in [`pull_request_template.md`](pull_request_template.md) — including its unit-test checklist item.
 
 ## MCP server configuration
 

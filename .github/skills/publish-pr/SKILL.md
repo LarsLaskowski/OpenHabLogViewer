@@ -19,8 +19,8 @@ Follow this workflow:
 7. Push the branch to `origin` and set upstream tracking.
 8. Create a pull request with GitHub CLI:
    - base branch: `main`, unless the user explicitly requests a different base
-   - title: concise summary of the change
-   - body: short summary of what changed
+   - title: concise summary of the change, following the `[area] Description` convention from `docs/CONTRIBUTING.md`
+   - body: follow the structure in `.github/pull_request_template.md` (Description, Issues, Reviewer Notes, Test Plan, Checklist, Next Steps)
 9. After the pull request is created, switch back to the `main` branch.
 10. Report the branch name and pull request URL clearly.
 
