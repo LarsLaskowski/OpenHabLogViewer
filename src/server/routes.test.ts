@@ -13,6 +13,7 @@ const NO_HEARTBEAT = 1_000_000_000;
 function baseConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   return {
     port: 9001,
+    bindAddress: '0.0.0.0',
     initialLinesPerFile: 500,
     maxBufferedLines: 2000,
     clientMaxRenderedLines: 500,

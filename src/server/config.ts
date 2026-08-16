@@ -117,6 +117,10 @@ export function loadConfig(): AppConfig {
 
   return {
     port: clampInteger('PORT', 9001, 1, 65_535),
+    // Default '0.0.0.0' preserves current behavior (bind all interfaces). No
+    // further validation: an unbindable address fails loudly at listen() time
+    // (see the server's 'error' handler), so any string is passed through.
+    bindAddress: process.env.BIND_ADDRESS?.trim() || '0.0.0.0',
     initialLinesPerFile: clampInteger('INITIAL_LINES_PER_FILE', 500, 1, 100_000),
     maxBufferedLines: clampInteger('MAX_BUFFERED_LINES', 2_000, 100, 1_000_000),
     // The browser hard-caps rendering at CLIENT_MAX_RENDERED_LINES_CAP (500) for

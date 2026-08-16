@@ -12,6 +12,7 @@ export interface SourceConfig {
 
 export interface AppConfig {
   port: number;
+  bindAddress: string;
   initialLinesPerFile: number;
   maxBufferedLines: number;
   clientMaxRenderedLines: number;

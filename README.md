@@ -19,6 +19,7 @@ Live web UI for `events.log` and `openhab.log` built with Node.js, Express, and 
 | Variable | Default | Description |
 | --- | --- | --- |
 | `PORT` | `9001` | HTTP port used by the application |
+| `BIND_ADDRESS` | `0.0.0.0` | Network interface address the server listens on. Set to `127.0.0.1` to restrict access to the local host, e.g. when a reverse proxy runs on the same machine. An unbindable address (typo, address not present on this host) makes startup fail loudly instead of binding somewhere unexpected. |
 | `OPENHAB_LOG_DIR` | `/var/log/openhab` | Fallback directory for log files |
 | `EVENTS_LOG_PATH` | `/var/log/openhab/events.log` | Full path to `events.log` |
 | `OPENHAB_LOG_PATH` | `/var/log/openhab/openhab.log` | Full path to `openhab.log` |

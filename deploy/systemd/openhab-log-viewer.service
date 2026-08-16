@@ -20,6 +20,8 @@ Environment=CLIENT_MAX_RENDERED_LINES=500
 # Uncomment to reject requests whose Host header is not on the allowlist
 # (DNS-rebinding mitigation). Comma-separated, no port; use bracketed IPv6:
 # Environment=ALLOWED_HOSTS=openhab-pi,192.168.1.10
+# Uncomment to restrict the listener, e.g. when a reverse proxy runs on this host:
+# Environment=BIND_ADDRESS=127.0.0.1
 EnvironmentFile=-/etc/default/openhab-log-viewer
 ExecStart=/usr/bin/node dist/server/index.cjs
 Restart=always

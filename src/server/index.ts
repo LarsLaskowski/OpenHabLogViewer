@@ -79,8 +79,13 @@ async function main(): Promise<void> {
   app.use(htmlLimiter);
   app.use(createSpaFallback(clientDistDir));
 
-  const server = app.listen(config.port, () => {
-    console.log(`OpenHab Log Viewer listening on port ${config.port}`);
+  const server = app.listen(config.port, config.bindAddress, () => {
+    console.log(`OpenHab Log Viewer listening on ${config.bindAddress}:${config.port}`);
+  });
+
+  server.on('error', (error) => {
+    console.error('[startup] Failed to bind server:', error);
+    process.exit(1);
   });
 
   const shutdown = createShutdown({ tailers, sseHub, server });
