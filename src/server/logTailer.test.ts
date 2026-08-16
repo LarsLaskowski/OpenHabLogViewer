@@ -339,6 +339,52 @@ describe('LogTailer', () => {
     }
   });
 
+  it('cleanly re-tails a larger replacement file instead of reading at the stale offset (issue #136)', async () => {
+    const h = makeHarness();
+    try {
+      writeFileSync(h.filePath, 'old line\n');
+      await h.tailer.start();
+
+      // Replace the tailed file with a different-inode file that is already
+      // larger than the previous offset, without letting a sync cycle run in
+      // between (classic logrotate move). Detection now derives the file key
+      // and size from a single fstat() on the handle used for the read itself,
+      // so the read can never straddle a by-path stat and a by-path re-open
+      // that resolve to different files: the offset is reset before any bytes
+      // of the replacement are read, and the full new content comes back
+      // intact rather than a chunk starting mid-line at the stale offset.
+      renameSync(h.filePath, `${h.filePath}.1`);
+      writeFileSync(h.filePath, 'zzzzzzzzzzzzzzzzzzz\nfresh line\n');
+      await delay(200);
+
+      assert.ok(h.statuses.some((s) => s.state === 'rotated'));
+      assert.deepEqual(
+        h.lines.map((l) => l.rawLine),
+        ['zzzzzzzzzzzzzzzzzzz', 'fresh line']
+      );
+    } finally {
+      await cleanup(h);
+    }
+  });
+
+  it('reports a missing status with no crash when the file is deleted between polls (issue #136)', async () => {
+    const h = makeHarness();
+    const capture = captureUnhandledRejections();
+    try {
+      writeFileSync(h.filePath, 'first\n');
+      await h.tailer.start();
+
+      rmSync(h.filePath);
+      await delay(150);
+
+      assert.ok(h.statuses.some((s) => s.state === 'missing'));
+      assert.deepEqual(capture.rejections, []);
+    } finally {
+      capture.dispose();
+      await cleanup(h);
+    }
+  });
+
   it('does not load a huge unterminated line into memory on bootstrap (byte cap)', async () => {
     const h = makeHarness();
     try {
