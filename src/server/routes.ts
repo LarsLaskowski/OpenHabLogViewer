@@ -162,6 +162,13 @@ export function createApiRouter(dependencies: RouteDependencies): Router {
     response.on('close', removeClient);
   });
 
+  // Catches any method/path under /api that none of the routes above matched,
+  // so unknown endpoints get a JSON 404 instead of falling through to the SPA
+  // HTML fallback (see issue #137).
+  router.use((_request: Request, response: Response) => {
+    response.status(404).json({ error: 'Not found' });
+  });
+
   return router;
 }
 
@@ -183,6 +190,18 @@ function createSyncCursor(
   };
 }
 
+// Rejects values `Number.parseInt` would silently accept with trailing garbage
+// (e.g. "50abc" -> 50), so malformed query params fail with 400 instead of
+// being parsed leniently (see issue #137).
+function parseStrictNonNegativeInt(value: string): number | null {
+  if (!/^\d+$/.test(value)) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
 function parseSyncLimit(request: Request, maxLimit: number): number | null {
   const rawLimit = request.query.limit;
   if (rawLimit === undefined) {
@@ -193,8 +212,8 @@ function parseSyncLimit(request: Request, maxLimit: number): number | null {
     return null;
   }
 
-  const parsedLimit = Number.parseInt(rawLimit, 10);
-  if (!Number.isInteger(parsedLimit) || parsedLimit < 1) {
+  const parsedLimit = parseStrictNonNegativeInt(rawLimit);
+  if (parsedLimit === null || parsedLimit < 1) {
     return null;
   }
 
@@ -207,6 +226,5 @@ function parseAfterId(request: Request): number | null {
     return null;
   }
 
-  const parsedAfterId = Number.parseInt(rawAfterId, 10);
-  return Number.isInteger(parsedAfterId) && parsedAfterId >= 0 ? parsedAfterId : null;
+  return parseStrictNonNegativeInt(rawAfterId);
 }

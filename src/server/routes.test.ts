@@ -78,6 +78,30 @@ async function startApp(opts: {
   };
 }
 
+describe('unknown /api routes', () => {
+  it('returns a JSON 404 instead of falling through to the SPA HTML (issue #137)', async () => {
+    const ctx = await startApp();
+    try {
+      const res = await fetch(`${ctx.base}/api/nope`);
+      assert.equal(res.status, 404);
+      assert.deepEqual(await res.json(), { error: 'Not found' });
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  it('returns a JSON 404 for non-GET methods on a known route path too', async () => {
+    const ctx = await startApp();
+    try {
+      const res = await fetch(`${ctx.base}/api/health`, { method: 'POST' });
+      assert.equal(res.status, 404);
+      assert.deepEqual(await res.json(), { error: 'Not found' });
+    } finally {
+      await ctx.close();
+    }
+  });
+});
+
 describe('GET /api/health', () => {
   it('returns only the status by default (no host details)', async () => {
     const ctx = await startApp();
@@ -140,6 +164,15 @@ describe('GET /api/bootstrap', () => {
     }
   });
 
+  it('rejects a limit with trailing garbage instead of silently truncating it (issue #137)', async () => {
+    const ctx = await startApp();
+    try {
+      assert.equal((await fetch(`${ctx.base}/api/bootstrap?limit=50abc`)).status, 400);
+    } finally {
+      await ctx.close();
+    }
+  });
+
   it('honors a valid limit by returning the most recent lines', async () => {
     const buffer = new LogBuffer(2000);
     for (let i = 0; i < 5; i += 1) {
@@ -161,6 +194,15 @@ describe('GET /api/resync', () => {
     try {
       assert.equal((await fetch(`${ctx.base}/api/resync`)).status, 400);
       assert.equal((await fetch(`${ctx.base}/api/resync?afterId=abc`)).status, 400);
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  it('rejects an afterId with trailing garbage instead of silently truncating it (issue #137)', async () => {
+    const ctx = await startApp();
+    try {
+      assert.equal((await fetch(`${ctx.base}/api/resync?afterId=7xyz&limit=10`)).status, 400);
     } finally {
       await ctx.close();
     }
