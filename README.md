@@ -41,6 +41,8 @@ When the app runs behind a reverse proxy (Nginx, Caddy, Traefik), set `TRUST_PRO
 
 The app has no built-in authentication and relies on the browser's same-origin policy, which [DNS rebinding](https://en.wikipedia.org/wiki/DNS_rebinding) can bypass. Setting `ALLOWED_HOSTS` to the host names you actually use to reach the viewer closes that gap: a rebinding request still carries the attacker's `Host` header, which the allowlist rejects with `403`. This is a hardening measure, not authentication — for real access control, put the app behind an authenticating reverse proxy.
 
+`/api/bootstrap` and `/api/resync` responses are gzip-compressed when the client sends `Accept-Encoding: gzip` (log-heavy JSON payloads compress well, which helps most over Wi-Fi or a remote reverse-proxy connection). `/api/stream` is never compressed, since buffering would delay live SSE delivery.
+
 ## Development and build
 
 ```bash

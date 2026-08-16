@@ -61,8 +61,8 @@ deployment described in [`README.md`](../README.md#systemd-installation-on-linux
    *before* the HTTP server starts listening, so no SSE client can observe a
    half-seeded buffer.
 6. Builds the Express `app`: security headers, optional host validation,
-   `trust proxy`, two rate limiters, the `/api` router, and static serving of
-   `dist/client`.
+   `trust proxy`, `/api` response compression, two rate limiters, the `/api`
+   router, and static serving of `dist/client`.
 7. Starts listening and wires `createShutdown()` to `SIGINT`/`SIGTERM`.
 
 ### Security headers and same-origin policy
@@ -93,6 +93,20 @@ authentication** — it only pins which hostnames the browser may use to reach
 the app (see [#132](https://github.com/LarsLaskowski/OpenHabLogViewer/issues/132)).
 Unset (the default), the middleware is not registered at all, preserving prior
 behavior.
+
+### API response compression
+
+`createApiCompression()` (`src/server/apiCompression.ts`) wraps the
+`compression` middleware and is mounted first under `/api`, ahead of the
+router. `/api/bootstrap` and reset-mode `/api/resync` responses can run to a
+few hundred KB of repetitive JSON (raw line text duplicated across `rawLine`
+and `message`, timestamps, logger names), which gzips well; `/api/stream` is
+excluded so buffering does not delay live SSE delivery. The exclusion checks
+`request.path !== '/api/stream'` using the full mounted path rather than a
+router-relative `/stream`, because `compression`'s filter runs lazily on
+first write, by which point Express has already restored `request.path` to
+the incoming request path (see
+[#140](https://github.com/LarsLaskowski/OpenHabLogViewer/issues/140)).
 
 ### Rate limiting
 

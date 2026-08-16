@@ -17,10 +17,12 @@
     "coverage:lcov": "node -e \"require('node:fs').mkdirSync('coverage',{recursive:true})\" && node --enable-source-maps --import tsx --test --experimental-test-coverage --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info src/server/*.test.ts src/client/*.test.ts"
   },
   "dependencies": {
+    "compression": "^1.8.1",
     "express": "^5.1.0",
     "express-rate-limit": "^8.6.2"
   },
   "devDependencies": {
+    "@types/compression": "^1.8.1",
     "@types/express": "^5.0.3",
     "@types/jsdom": "^30.0.0",
     "@types/node": "^26.2.0",
