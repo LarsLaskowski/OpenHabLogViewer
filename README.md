@@ -56,6 +56,8 @@ dist/
   server/
 ```
 
+Both bundles are built with source maps enabled, and `dist/client/main.js.map` is served alongside the client bundle. This is intentional: it eases in-browser debugging, and the source is public anyway. (The server-side `dist/server/index.cjs.map` is not exposed, since `express.static` only serves `dist/client`.)
+
 Start locally:
 
 ```bash
