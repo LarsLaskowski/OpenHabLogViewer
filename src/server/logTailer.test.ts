@@ -397,4 +397,41 @@ describe('LogTailer', () => {
       await cleanup(h);
     }
   });
+
+  it('normalizes CRLF line endings the same way as LF on bootstrap', async () => {
+    const h = makeHarness();
+    try {
+      writeFileSync(h.filePath, 'a\r\nb\r\nc\r\n');
+      const initial = await h.tailer.start();
+      assert.deepEqual(initial.map((l) => l.rawLine), ['a', 'b', 'c']);
+    } finally {
+      await cleanup(h);
+    }
+  });
+
+  it('returns the trailing line even when the file does not end with a newline', async () => {
+    const h = makeHarness();
+    try {
+      writeFileSync(h.filePath, 'a\nb\nc');
+      const initial = await h.tailer.start();
+      assert.deepEqual(initial.map((l) => l.rawLine), ['a', 'b', 'c']);
+    } finally {
+      await cleanup(h);
+    }
+  });
+
+  it('counts newlines correctly across multiple 64 KB read chunks (regression for #139)', async () => {
+    const h = makeHarness();
+    try {
+      // 150 KB with no newlines: spans more than two 64 KB read chunks but
+      // stays well under MAX_TAIL_SCAN_BYTES (8 MB), so the backward scan
+      // must run to the start of the file without ever finding a newline.
+      const content = 'A'.repeat(150 * 1024);
+      writeFileSync(h.filePath, content);
+      const initial = await h.tailer.start();
+      assert.deepEqual(initial.map((l) => l.rawLine), [content]);
+    } finally {
+      await cleanup(h);
+    }
+  });
 });

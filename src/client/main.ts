@@ -482,14 +482,12 @@ function connectStream(): void {
       return;
     }
 
-    let displayedLines: number | null = null;
     if (!state.paused) {
       scheduleLiveRender({ logLines: 1 });
     }
 
     completeSseTiming({
       bufferedAfter: state.lines.length,
-      displayedLines,
       paused: state.paused,
       renderScheduled: !state.paused,
       source: line.source
