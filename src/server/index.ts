@@ -7,6 +7,7 @@ import { SourceStatus } from './types.js';
 import { LogLineParser } from './logLineParser.js';
 import { LogTailer } from './logTailer.js';
 import { createApiRouter } from './routes.js';
+import { createApiCompression } from './apiCompression.js';
 import { createHostValidator } from './hostValidation.js';
 import { createSpaFallback } from './spaFallback.js';
 import { createShutdown } from './shutdown.js';
@@ -73,7 +74,12 @@ async function main(): Promise<void> {
     legacyHeaders: false
   });
 
-  app.use('/api', apiLimiter, createApiRouter({ config, buffer, sseHub, getStatuses: () => Array.from(sourceStatuses.values()) }));
+  app.use(
+    '/api',
+    createApiCompression(),
+    apiLimiter,
+    createApiRouter({ config, buffer, sseHub, getStatuses: () => Array.from(sourceStatuses.values()) })
+  );
   app.use(express.static(clientDistDir));
 
   app.use(htmlLimiter);
