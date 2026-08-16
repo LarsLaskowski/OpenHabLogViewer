@@ -90,6 +90,11 @@ describe('loadConfig integer clamping', () => {
     assert.equal(loadConfig().maxSseClients, 10);
   });
 
+  it('falls back to the default for a value with trailing garbage instead of silently truncating it (issue #137)', () => {
+    process.env.PORT = '9001x';
+    assert.equal(loadConfig().port, 9001);
+  });
+
   it('clamps POLL_INTERVAL_MS to the [100, 5000] range', () => {
     process.env.POLL_INTERVAL_MS = '10';
     assert.equal(loadConfig().pollIntervalMs, 100);

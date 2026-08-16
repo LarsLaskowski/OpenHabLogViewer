@@ -8,6 +8,7 @@ import { LogLineParser } from './logLineParser.js';
 import { LogTailer } from './logTailer.js';
 import { createApiRouter } from './routes.js';
 import { createHostValidator } from './hostValidation.js';
+import { createSpaFallback } from './spaFallback.js';
 import { createShutdown } from './shutdown.js';
 import { SseHub } from './sseHub.js';
 import { createSeededLinePusher } from './startupSeed.js';
@@ -76,9 +77,7 @@ async function main(): Promise<void> {
   app.use(express.static(clientDistDir));
 
   app.use(htmlLimiter);
-  app.use((_request, response) => {
-    response.sendFile(path.join(clientDistDir, 'index.html'));
-  });
+  app.use(createSpaFallback(clientDistDir));
 
   const server = app.listen(config.port, () => {
     console.log(`OpenHab Log Viewer listening on port ${config.port}`);

@@ -3,8 +3,16 @@ import fs from 'node:fs';
 import { AppConfig, LogSource, SourceConfig } from './types.js';
 
 function clampInteger(name: string, fallback: number, min: number, max: number): number {
-  const rawValue = process.env[name];
+  const rawValue = process.env[name]?.trim();
   if (!rawValue) {
+    return fallback;
+  }
+
+  // Reject trailing garbage (e.g. "9001x") that `Number.parseInt` would
+  // otherwise silently accept as 9001 (see issue #137). Configuration must
+  // never make startup fail here, so this falls back rather than throwing.
+  if (!/^\d+$/.test(rawValue)) {
+    console.warn(`[config] ${name}=${rawValue} is not a valid integer; using ${fallback}`);
     return fallback;
   }
 
