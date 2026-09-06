@@ -19,7 +19,7 @@
   "dependencies": {
     "compression": "^1.8.1",
     "express": "^5.1.0",
-    "express-rate-limit": "^8.6.2"
+    "express-rate-limit": "^8.7.0"
   },
   "devDependencies": {
     "@types/compression": "^1.8.1",
@@ -28,7 +28,7 @@
     "@types/node": "^26.4.1",
     "esbuild": "^0.28.2",
     "jsdom": "^30.0.1",
-    "tsx": "^4.23.12",
+    "tsx": "^4.23.13",
     "typescript": "^7.0.2"
   }
 }
