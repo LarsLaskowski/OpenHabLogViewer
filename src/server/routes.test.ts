@@ -23,6 +23,7 @@ function baseConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     trustProxy: false,
     healthDetails: false,
     allowedHosts: [],
+    logTimeZone: null,
     sources: [],
     ...overrides
   };

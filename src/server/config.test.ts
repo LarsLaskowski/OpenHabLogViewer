@@ -17,6 +17,7 @@ const CONFIG_ENV_KEYS = [
   'TRUST_PROXY',
   'HEALTH_DETAILS',
   'ALLOWED_HOSTS',
+  'LOG_TIMEZONE',
   'OPENHAB_LOG_DIR',
   'EVENTS_LOG_PATH',
   'OPENHAB_LOG_PATH'
@@ -56,6 +57,7 @@ describe('loadConfig defaults', () => {
     assert.equal(config.trustProxy, false);
     assert.equal(config.healthDetails, false);
     assert.deepEqual(config.allowedHosts, []);
+    assert.equal(config.logTimeZone, null);
     assert.equal(config.sources.length, 2);
     assert.equal(config.sources[0].source, 'events');
     assert.equal(config.sources[0].fileName, 'events.log');
@@ -174,6 +176,27 @@ describe('loadConfig allowed hosts parsing', () => {
   it('treats a whitespace-only value as unset', () => {
     process.env.ALLOWED_HOSTS = '   ';
     assert.deepEqual(loadConfig().allowedHosts, []);
+  });
+});
+
+describe('loadConfig log timezone parsing', () => {
+  it('defaults to null (process timezone)', () => {
+    assert.equal(loadConfig().logTimeZone, null);
+  });
+
+  it('accepts a valid IANA timezone and normalizes its spelling', () => {
+    process.env.LOG_TIMEZONE = ' america/new_york ';
+    assert.equal(loadConfig().logTimeZone, 'America/New_York');
+  });
+
+  it('falls back to null for an unknown timezone instead of failing startup', () => {
+    process.env.LOG_TIMEZONE = 'Mars/Olympus_Mons';
+    assert.equal(loadConfig().logTimeZone, null);
+  });
+
+  it('treats a whitespace-only value as unset', () => {
+    process.env.LOG_TIMEZONE = '   ';
+    assert.equal(loadConfig().logTimeZone, null);
   });
 });
 

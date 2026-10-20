@@ -22,6 +22,7 @@ export interface AppConfig {
   trustProxy: boolean | number | string;
   healthDetails: boolean;
   allowedHosts: string[];
+  logTimeZone: string | null;
   sources: SourceConfig[];
 }
 

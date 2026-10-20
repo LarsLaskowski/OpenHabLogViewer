@@ -112,6 +112,23 @@ function parseTrustProxy(name: string): boolean | number | string {
   return rawValue;
 }
 
+function parseTimeZone(name: string): string | null {
+  const rawValue = process.env[name]?.trim();
+  if (!rawValue) {
+    // Unset/empty: timestamps are read in the process's local timezone.
+    return null;
+  }
+
+  try {
+    // Intl throws a RangeError for an unknown IANA zone name; the resolved
+    // name is the canonical spelling (e.g. "utc" -> "UTC").
+    return new Intl.DateTimeFormat('en-US', { timeZone: rawValue }).resolvedOptions().timeZone;
+  } catch {
+    console.warn(`[config] ${name}=${rawValue} is not a valid IANA timezone; using the process timezone`);
+    return null;
+  }
+}
+
 export function loadConfig(): AppConfig {
   const logDir = process.env.OPENHAB_LOG_DIR?.trim() || '/var/log/openhab';
 
@@ -144,6 +161,11 @@ export function loadConfig(): AppConfig {
     // rejected — a mitigation against DNS rebinding for this unauthenticated
     // LAN app (see issue #132).
     allowedHosts: parseAllowedHosts('ALLOWED_HOSTS'),
+    // Unset by default (process timezone). openHAB writes log timestamps
+    // without an offset in its own configured timezone, which can differ from
+    // the host's (e.g. host on UTC, openHAB on America/New_York), so this lets
+    // the timestamps be read in openHAB's timezone instead (see issue #195).
+    logTimeZone: parseTimeZone('LOG_TIMEZONE'),
     sources: [
       resolveSourceConfig('events', process.env.EVENTS_LOG_PATH, logDir, 'events.log'),
       resolveSourceConfig('openhab', process.env.OPENHAB_LOG_PATH, logDir, 'openhab.log')

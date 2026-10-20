@@ -32,6 +32,7 @@ Live web UI for `events.log` and `openhab.log` built with Node.js, Express, and 
 | `TRUST_PROXY` | `false` | Express `trust proxy` setting. Leave off for direct deployments. Set to the number of proxy hops (e.g. `1`) when running behind a reverse proxy so rate limiting keys on the real client IP. Also accepts `true`, a preset (`loopback`), or a comma-separated list of IPs/subnets. |
 | `HEALTH_DETAILS` | `false` | When off, `/api/health` returns only `{ "status": "ok" }`. Set to `true` to include host details (pid, uptime, per-source states, SSE client counts) for local monitoring. Keep it off when the endpoint is reachable through a reverse proxy, so those details are not exposed. |
 | `ALLOWED_HOSTS` | *(unset)* | Comma-separated allowlist of host names / addresses the app may be reached under, e.g. `openhab-pi,openhab-pi.local,192.168.1.10,localhost`. When set, requests whose `Host` header is not on the list get `403 Forbidden host`. Entries are matched case-insensitively and the port is ignored (list hosts without a port; list an IPv6 address in bracketed form, e.g. `[::1]`). Unset → validation is off (default). |
+| `LOG_TIMEZONE` | *(unset)* | IANA timezone that openHAB writes its log timestamps in, e.g. `America/New_York` or `Europe/Berlin`. Set it to the timezone shown in openHAB under *Settings → Regional Settings* when it differs from the host's timezone (see [Timezone of log timestamps](#timezone-of-log-timestamps)). Unset → timestamps are read in the timezone of the viewer process. An unknown name logs a warning and falls back to the process timezone. |
 
 `EVENTS_LOG_PATH` and `OPENHAB_LOG_PATH` take precedence over `OPENHAB_LOG_DIR`.
 
@@ -40,6 +41,18 @@ Per-IP limiting keys on the client IP as seen by the app. Behind a reverse proxy
 When the app runs behind a reverse proxy (Nginx, Caddy, Traefik), set `TRUST_PROXY` so the proxy's `X-Forwarded-For` header is honored. Without it, rate limiting keys every request on the proxy's IP, letting clients exhaust each other's request budget. Keep it **off** for direct deployments, otherwise clients can spoof their IP via `X-Forwarded-For`.
 
 The app has no built-in authentication and relies on the browser's same-origin policy, which [DNS rebinding](https://en.wikipedia.org/wiki/DNS_rebinding) can bypass. Setting `ALLOWED_HOSTS` to the host names you actually use to reach the viewer closes that gap: a rebinding request still carries the attacker's `Host` header, which the allowlist rejects with `403`. This is a hardening measure, not authentication — for real access control, put the app behind an authenticating reverse proxy.
+
+### Timezone of log timestamps
+
+openHAB writes log timestamps in local time **without** a timezone offset. The viewer has to know which timezone that local time refers to; by default it assumes the timezone of its own process. If the host runs on UTC (common on servers and VMs) but openHAB is configured for another timezone in its Regional Settings, all timestamps in the viewer are shifted by the difference (see [#195](https://github.com/LarsLaskowski/OpenHabLogViewer/issues/195)).
+
+Fix it by setting `LOG_TIMEZONE` to the openHAB timezone, e.g. in `/etc/default/openhab-log-viewer`:
+
+```bash
+LOG_TIMEZONE=America/New_York
+```
+
+Then restart the service (`sudo systemctl restart openhab-log-viewer`) and reload the browser. On startup the viewer logs the timezone it uses (`Reading log timestamps as …`), visible via `journalctl -u openhab-log-viewer`.
 
 `/api/bootstrap` and `/api/resync` responses are gzip-compressed when the client sends `Accept-Encoding: gzip` (log-heavy JSON payloads compress well, which helps most over Wi-Fi or a remote reverse-proxy connection). `/api/stream` is never compressed, since buffering would delay live SSE delivery.
 
@@ -120,7 +133,25 @@ Source, level, search text, theme, order, auto-scroll, and pause state are store
 
 ## Deploy package and copy deployment
 
-Preferred deployment flow:
+### Prebuilt release package (recommended)
+
+Every [GitHub release](https://github.com/LarsLaskowski/OpenHabLogViewer/releases/latest) ships a ready-to-run package, `openhab-log-viewer-vX.Y.Z.tar.gz` (or `.zip`). It contains the built `dist/` directory, the `deploy/` folder with the systemd unit, `package.json`, and this README.
+
+You do **not** need to build anything, and you do **not** need npm on the target host: the server is bundled into a single `dist/server/index.cjs` file, so **Node.js 22 or newer** is the only runtime requirement. Check your version with `node --version`.
+
+```bash
+# On the target host
+curl -fsSLO https://github.com/LarsLaskowski/OpenHabLogViewer/releases/download/vX.Y.Z/openhab-log-viewer-vX.Y.Z.tar.gz
+tar -xzf openhab-log-viewer-vX.Y.Z.tar.gz
+sudo mkdir -p /opt/openhab-log-viewer
+sudo cp -r openhab-log-viewer-vX.Y.Z/* /opt/openhab-log-viewer/
+```
+
+Then continue with [systemd installation on Linux](#systemd-installation-on-linux), starting at the ownership step in [1. Copy the files to the target host](#1-copy-the-files-to-the-target-host).
+
+### Building the package yourself
+
+Only needed when you want to run unreleased changes:
 
 1. Develop the project externally
 2. Run `npm install` and `npm run build`
@@ -143,7 +174,7 @@ Because the server is bundled to `dist/server/index.cjs`, the target host only n
 
 ## systemd installation on Linux
 
-This section is a complete walkthrough for running the viewer as a background service on a Linux host with systemd. It works both for the deploy package described above and for a checkout you built yourself. The bundled unit file `deploy/systemd/openhab-log-viewer.service` assumes the application lives in `/opt/openhab-log-viewer` and runs as the `openhab` user.
+This section is a complete walkthrough for running the viewer as a background service on a Linux host with systemd. It works both for the prebuilt release package or deploy package described above and for a checkout you built yourself. The bundled unit file `deploy/systemd/openhab-log-viewer.service` assumes the application lives in `/opt/openhab-log-viewer` and runs as the `openhab` user.
 
 ### Prerequisites
 
@@ -227,6 +258,8 @@ MAX_SSE_CLIENTS_PER_IP=3
 # TRUST_PROXY=1
 # Restrict which Host headers are accepted (DNS-rebinding mitigation):
 # ALLOWED_HOSTS=openhab-pi,192.168.1.10
+# Timezone openHAB writes its log timestamps in, if it differs from the host's:
+# LOG_TIMEZONE=America/New_York
 ```
 
 See the [Configuration](#configuration) table for every available variable. Apply changes with:

@@ -12,6 +12,9 @@ Environment=OPENHAB_LOG_PATH=/var/log/openhab/openhab.log
 Environment=INITIAL_LINES_PER_FILE=500
 Environment=MAX_BUFFERED_LINES=10000
 Environment=CLIENT_MAX_RENDERED_LINES=500
+# Uncomment when the host timezone differs from the one in openHAB's Regional
+# Settings (e.g. host on UTC), so log timestamps are read in openHAB's timezone:
+# Environment=LOG_TIMEZONE=America/New_York
 # Uncomment when running behind a reverse proxy (value = number of proxy hops):
 # Environment=TRUST_PROXY=1
 # Uncomment to expose host details (pid, uptime, source states) on /api/health.
