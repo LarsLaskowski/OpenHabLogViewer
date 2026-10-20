@@ -18,7 +18,7 @@ async function main(): Promise<void> {
   const config = loadConfig();
   const buffer = new LogBuffer(config.maxBufferedLines);
   const sseHub = new SseHub(15_000, config.maxSseClients, config.maxSseClientsPerIp);
-  const parser = new LogLineParser();
+  const parser = new LogLineParser(config.logTimeZone);
   const sourceStatuses = new Map(config.sources.map((source) => [source.source, createIdleStatus(source)]));
   const linePusher = createSeededLinePusher(buffer, sseHub);
 
@@ -87,6 +87,9 @@ async function main(): Promise<void> {
 
   const server = app.listen(config.port, config.bindAddress, () => {
     console.log(`OpenHab Log Viewer listening on ${config.bindAddress}:${config.port}`);
+    // Logged so a timestamp offset is easy to diagnose from the journal (issue #195).
+    const logTimeZone = config.logTimeZone ?? `${Intl.DateTimeFormat().resolvedOptions().timeZone} (process timezone)`;
+    console.log(`Reading log timestamps as ${logTimeZone}`);
   });
 
   server.on('error', (error) => {

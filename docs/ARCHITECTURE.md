@@ -161,6 +161,9 @@ Notable clamps and their stated reasons (from code comments):
   details to anyone who can reach the endpoint, e.g. through a reverse proxy.
 - `ALLOWED_HOSTS` defaults to empty (validation off) so setting it is a
   deliberate opt-in hardening step, not a breaking default change.
+- `LOG_TIMEZONE` defaults to unset (process timezone) to keep the existing
+  behavior; an unknown IANA name logs a warning and falls back to the
+  process timezone rather than failing startup.
 
 `resolveSourceConfig()` resolves `EVENTS_LOG_PATH`/`OPENHAB_LOG_PATH` (or
 `OPENHAB_LOG_DIR` + the fixed file name) to an absolute, `realpathSync`-resolved
@@ -256,12 +259,22 @@ continuation — `isContinuation` is only true when neither pattern matches,
 which distinguishes "an oddly formatted header-like line" from "clearly wraps
 the previous entry".
 
-`parseLocalTimestamp` interprets the parsed date/time fields as **local
-time** (via the multi-argument `Date` constructor) and normalizes to an
-ISO/UTC string, because openHAB writes log timestamps in the host's local
-time without a zone offset. This assumes the viewer runs in the same
-timezone as the openHAB instance producing the logs — this assumption is
-stated directly in the source and is not configurable today.
+`parseTimestamp` interprets the parsed date/time fields as wall-clock time
+and normalizes to an ISO/UTC string, because openHAB writes log timestamps
+without a zone offset in its own configured timezone. By default the fields
+are read as **process-local time** (via the multi-argument `Date`
+constructor), which assumes the viewer runs in the same timezone as openHAB.
+That assumption breaks when the host runs on UTC but openHAB's Regional
+Settings use another zone (see
+[#195](https://github.com/LarsLaskowski/OpenHabLogViewer/issues/195)), so
+`LOG_TIMEZONE` lets the parser read them in an explicit IANA zone instead.
+The zoned conversion uses only `Intl.DateTimeFormat` (no timezone database
+dependency): it brackets the wall time with the offsets a day before and
+after, keeps the candidate instants that map back to the same wall time,
+takes the earlier one for an ambiguous DST fall-back time, and shifts a
+non-existent spring-forward time forward. The resolved offset is cached per
+wall-clock minute, since zone transitions fall on minute boundaries and
+consecutive lines usually share a minute.
 
 Per-source state (`lastGroupIdBySource`, `lastHeaderBySource`,
 `nextGroupBySource`) lives on the single shared `LogLineParser` instance
